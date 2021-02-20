@@ -20,11 +20,13 @@ GLFWwindow* window;
 #endif
 
 // Include GLM
-//#include <glm/glm.hpp>
-//using namespace glm;
+#include <glm/glm.hpp>
+using namespace glm;
 
 int main( void )
 {
+  glm::ve
+
   // Initialise GLFW
   if( !glfwInit() )
   {
@@ -37,7 +39,9 @@ int main( void )
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+//  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+
 
   // Open a window and create its OpenGL context
   window = glfwCreateWindow( 1024, 768, "Tutorial 01", NULL, NULL);
@@ -63,13 +67,15 @@ int main( void )
   // Dark blue background
   glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
 
-  // do{
+  glfwSetKeyCallback(window, [](GLFWwindow* w, int key, int scancode, int action, int mods) {
+    std::cout << "KEY!" << std::endl;
+  });
+
   static std::function<void()> loop = [&]() {
     // Clear the screen. It's not mentioned before Tutorial 02, but it can cause flickering, so it's there nonetheless.
     glClear( GL_COLOR_BUFFER_BIT );
 
     // Draw nothing, see you in tutorial 2 !
-
 
     // Swap buffers
     glfwSwapBuffers(window);
@@ -77,8 +83,9 @@ int main( void )
   };
 
 #ifdef __EMSCRIPTEN__
-  emscripten_request_animation_frame_loop([](double t, void* data) -> EM_BOOL { loop(); return EM_TRUE; }, 0);
+  emscripten_set_main_loop([]() { loop(); }, -1, true);
 #else
+  std::cout << "BAD!\n" << std::endl;
   do {
     loop();
     // Check if the ESC key was pressed or the window was closed
