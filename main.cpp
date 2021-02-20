@@ -25,8 +25,6 @@ using namespace glm;
 
 int main( void )
 {
-  glm::ve
-
   // Initialise GLFW
   if( !glfwInit() )
   {

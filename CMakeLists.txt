@@ -13,7 +13,11 @@ if (NOT EMSCRIPTEN)
 #    find_package(GLEW REQUIRED)
 endif()
 
+add_subdirectory(external/glm)
+
 add_executable(main main.cpp)
+target_link_libraries(main glm)
+
 if (NOT EMSCRIPTEN)
     target_link_libraries(main glfw libglew_static GL)
 else()
