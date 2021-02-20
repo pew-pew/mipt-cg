@@ -9,6 +9,16 @@
 #include <GLFW/glfw3.h>
 GLFWwindow* window;
 
+#include <chrono>
+#include <iostream>
+#include <thread>
+#include <functional>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
+
 // Include GLM
 //#include <glm/glm.hpp>
 //using namespace glm;
@@ -53,7 +63,8 @@ int main( void )
   // Dark blue background
   glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
 
-  do{
+  // do{
+  static std::function<void()> loop = [&]() {
     // Clear the screen. It's not mentioned before Tutorial 02, but it can cause flickering, so it's there nonetheless.
     glClear( GL_COLOR_BUFFER_BIT );
 
@@ -63,10 +74,17 @@ int main( void )
     // Swap buffers
     glfwSwapBuffers(window);
     glfwPollEvents();
+  };
 
-  } // Check if the ESC key was pressed or the window was closed
-  while( glfwGetKey(window, GLFW_KEY_ESCAPE ) != GLFW_PRESS &&
+#ifdef __EMSCRIPTEN__
+  emscripten_request_animation_frame_loop([](double t, void* data) -> EM_BOOL { loop(); return EM_TRUE; }, 0);
+#else
+  do {
+    loop();
+    // Check if the ESC key was pressed or the window was closed
+  } while( glfwGetKey(window, GLFW_KEY_ESCAPE ) != GLFW_PRESS &&
       glfwWindowShouldClose(window) == 0 );
+#endif
 
   // Close OpenGL window and terminate GLFW
   glfwTerminate();
