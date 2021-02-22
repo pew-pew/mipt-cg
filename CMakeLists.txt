@@ -21,6 +21,12 @@ target_link_libraries(main glm)
 if (NOT EMSCRIPTEN)
     target_link_libraries(main glfw libglew_static GL)
 else()
-    target_link_options(main PUBLIC -s USE_GLFW=3)
+    target_link_options(main PRIVATE
+        "SHELL:
+        -s USE_GLFW=3
+        --preload-file ${CMAKE_SOURCE_DIR}/vertex.glsl@./vertex.glsl
+        --preload-file ${CMAKE_SOURCE_DIR}/fragment.glsl@./fragment.glsl
+        " # SHELL: is used to avoid deduplication of options (cmake does it by default)
+    ) # TODO: add dependency tracking
     set_target_properties(main PROPERTIES SUFFIX ".html")
 endif()
