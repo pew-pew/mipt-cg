@@ -39,8 +39,11 @@ void initGlewGLFW() {
 #ifndef __EMSCRIPTEN__
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  #ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
+  #endif
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
 #else
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
@@ -152,6 +155,10 @@ int main( void )
       -0.5, -0.5, 0,
        0.5, -0.5, 0,
        0,    0.5, 0,
+
+       0,   -1,    0,
+      -0.5, -0.5, 0,
+       0.5, -0.5, 0,
   };
 
   uint vbo = 0;
@@ -171,15 +178,36 @@ int main( void )
     glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
+  uint indices[] = {
+    0, 1, 2,
+  };
+
+  uint ebo = 0;
+  glGenBuffers(1, &ebo);
+
+  uint vao_el = 0;
+  glGenVertexArrays(1, &vao_el);
+
+  glBindVertexArray(vao_el);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+  glBindVertexArray(0);
+
   uint shaderProgram = createShaderProgram("./vertex.glsl", "./fragment.glsl");
 
   static std::function<void()> loop = [&]() {
     glClear( GL_COLOR_BUFFER_BIT );
 
     glUseProgram(shaderProgram);
-    glBindVertexArray(vao);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
+    glBindVertexArray(vao_el);
+    // glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+ 
     dumpGLErrors();
 
     glfwSwapBuffers(window);
