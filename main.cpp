@@ -23,6 +23,8 @@ GLFWwindow* window;
 
 // Include GLM
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp> // translate, rotate, scale, perspective
+#include <glm/gtc/type_ptr.hpp> // value_ptr
 using namespace glm;
 
 void initGlewGLFW() {
@@ -147,7 +149,9 @@ int main( void )
   // Dark blue background
   glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
 
+  static bool stop = false;
   glfwSetKeyCallback(window, [](GLFWwindow* w, int key, int scancode, int action, int mods) {
+    // stop = true;
     std::cout << "KEY!" << std::endl;
   });
 
@@ -156,9 +160,9 @@ int main( void )
        0.5, -0.5, 0,
        0,    0.5, 0,
 
-       0,   -1,    0,
-      -0.5, -0.5, 0,
-       0.5, -0.5, 0,
+      -0.5,  0.5, 0.5,
+       0.5,  0.5, 0.5,
+       0,   -0.5, 0.5,
   };
 
   uint vbo = 0;
@@ -179,6 +183,7 @@ int main( void )
   glBindVertexArray(0);
 
   uint indices[] = {
+    3, 4, 5,
     0, 1, 2,
   };
 
@@ -199,15 +204,57 @@ int main( void )
   glBindVertexArray(0);
 
   uint shaderProgram = createShaderProgram("./vertex.glsl", "./fragment.glsl");
+  int transLoc = glGetUniformLocation(shaderProgram, "trans");
 
+  glm::mat4 trans = glm::mat4(1.0f);
+  glUseProgram(shaderProgram);
+    glUniformMatrix4fv(transLoc, 1, false, glm::value_ptr(trans));
+  glUseProgram(0);
+
+
+  glm::vec3 pos = {0, 0, 0}; //std::sin(t), std::cos(t)};
+
+  double lastT = 0;
   static std::function<void()> loop = [&]() {
-    glClear( GL_COLOR_BUFFER_BIT );
+    glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(shaderProgram);
+
+    double t = glfwGetTime();
+    float dt = t - lastT;
+    lastT = t;
+
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+      pos += glm::vec3(1, 0, 0) * dt;
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+      pos += glm::vec3(-1, 0, 0) * dt;
+    }
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+      pos += glm::vec3(0, 0, -1) * dt;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+      pos += glm::vec3(0, 0, 1) * dt;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+      pos += glm::vec3(0, 1, 0) * dt;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+      pos += glm::vec3(0, -1, 0) * dt;
+    }
+
+    if (!stop) {
+      glm::mat4 trans = glm::mat4(1.0f);
+      //trans = glm::translate(trans, pos);
+      trans = glm::lookAt(pos, pos + glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0});
+      trans = glm::perspective<float>(glm::radians(60.), 1, 0.1, 100) * trans;
+      glUniformMatrix4fv(transLoc, 1, false, glm::value_ptr(trans));
+    }
+
     glBindVertexArray(vao_el);
     // glDrawArrays(GL_TRIANGLES, 0, 3);
-    glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
- 
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
     dumpGLErrors();
 
     glfwSwapBuffers(window);
@@ -220,7 +267,7 @@ int main( void )
 #else
   do {
     loop();
-  } while( glfwWindowShouldClose(window) == 0 );
+  } while (glfwWindowShouldClose(window) == 0);
 #endif
 
   // todo: cleanup opengl things
