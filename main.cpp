@@ -18,6 +18,7 @@ GLFWwindow* window;
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <algorithm>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -117,12 +118,26 @@ int main()
     );
 
   uint shaderProgram = createShaderProgram("./shaders/vertex.glsl", "./shaders/fragment.glsl");
+  uint shaderProgram2 = createShaderProgram("./shaders/vertex2.glsl", "./shaders/fragment.glsl");
   int transLoc = glGetUniformLocation(shaderProgram, "trans");
   int alphaLoc = glGetUniformLocation(shaderProgram, "alpha");
+  int transLoc2 = glGetUniformLocation(shaderProgram2, "trans");
+  int alphaLoc2 = glGetUniformLocation(shaderProgram2, "alpha");
 
   glm::vec3 pos = {2, 2, 6};
   glm::quat dir;
-  double lastT = glfwGetTime();
+  double trackT = 0;
+  static double lastT = glfwGetTime();
+  static bool cameraOnTrack = true;
+  static float lastKeyT = lastT;
+  glfwSetKeyCallback(window, [](GLFWwindow *win, int key, int scancode, int action, int mods) {
+    cameraOnTrack = false;
+    lastKeyT = lastT;
+    // if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
+    //   cameraOnTrack = !cameraOnTrack;
+    // }
+  });
+
   auto handleControls = [&]() {
     constexpr glm::vec3
       up{0, 1, 0},
@@ -132,6 +147,20 @@ int main()
     double t = glfwGetTime();
     float dt = t - lastT;
     lastT = t;
+
+    if (lastT - lastKeyT > 2)
+      cameraOnTrack = true;
+
+    if (cameraOnTrack) {
+      trackT += dt;
+      glm::quat rot = glm::angleAxis((float)trackT / 2, glm::vec3{0, 1, 0});
+      glm::vec3 cameraPos = rot * glm::vec3{0, 3, 6};
+      glm::quat cameraDir = rot * glm::angleAxis(-glm::pi<float>() / 6, glm::vec3{1, 0, 0});
+      float decay = 0.05;
+      pos = glm::mix(pos, cameraPos, decay);
+      dir = glm::slerp(dir, cameraDir, decay);
+      return;
+    }
 
     float move_speed = 2;
     float rot_speed = 2;
@@ -170,29 +199,24 @@ int main()
       dir = glm::rotate(dir, -rot, forward);
   };
 
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
-// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-  static std::function<void()> loop = [&]() {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    handleControls();
+  auto drawScene = [&]() {
     glm::mat4 viewproj = (
       glm::perspective<float>(glm::radians(60.), (float)width / height, 0.01, 10)
       * glm::lookAt(pos, pos + glm::mat3(dir) * glm::vec3{0, 0, -1}, glm::mat3(dir) * glm::vec3{0, 1, 0})
     );
+    glm::mat4 trans;
 
     glUseProgram(shaderProgram);
-
-    glm::mat4 trans;
     trans = viewproj;
     glUniformMatrix4fv(transLoc, 1, false, glm::value_ptr(trans));
     glUniform1f(alphaLoc, 1);
     cube.draw();
-    //teapot.draw();
+
+    glUseProgram(shaderProgram2);
+    trans = viewproj * glm::rotate((float)lastT, glm::vec3{0, 1, 0}) * glm::translate(glm::vec3{0, 1, 0}) * glm::scale(glm::vec3{0.1, 0.1, 0.1});
+    glUniformMatrix4fv(transLoc2, 1, false, glm::value_ptr(trans));
+    glUniform1f(alphaLoc2, 1);
+    teapot.draw();
 
     std::vector<glm::mat4> plane_transforms;
     for (glm::quat rot : plane_rots)
@@ -210,12 +234,26 @@ int main()
       return key(a) < key(b);
     });
 
+    glUseProgram(shaderProgram);
+    glUniform1f(alphaLoc, 0.5);
     for (glm::mat4 planetrans : plane_transforms) {
       trans = planetrans;
       glUniformMatrix4fv(transLoc, 1, false, glm::value_ptr(trans));
-      glUniform1f(alphaLoc, 0.5);
       plane.draw();
     }
+  };
+
+  glEnable(GL_DEPTH_TEST);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
+// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+  static std::function<void()> loop = [&]() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    handleControls();
+    drawScene();
 
     glfwSwapBuffers(window);
     glfwPollEvents();

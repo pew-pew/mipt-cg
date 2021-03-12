@@ -19,6 +19,5 @@ uniform float alpha;
 
 void main()
 {
-   gl_FragColor = vec4((alpha != 1.0 ? vec3(0) : color * log(gl_FragCoord.z / gl_FragCoord.w)), alpha);
-   //gl_FragColor = vec4((alpha != 1.0 ? vec3(0) : color * gl_FragColor.z), alpha);
+   gl_FragColor = vec4(color, alpha);
 }                                          

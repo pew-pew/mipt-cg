@@ -133,7 +133,7 @@ Mesh genXZPlane() {
             {-1, 0,  1},
             { 1, 0, -1},
         },
-        std::vector<glm::vec3>(6, glm::vec3{0.5, 0.5, 0.5})
+        std::vector<glm::vec3>(6, glm::vec3{0.0, 0.0, 0.0})
     );
 }
 
