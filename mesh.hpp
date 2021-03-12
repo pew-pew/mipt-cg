@@ -62,6 +62,9 @@ struct Mesh {
     }
 
     static Mesh fromPosColor(std::vector<glm::vec3> positions, std::vector<glm::vec3> colors = {}) {
+        if (colors.empty())
+            colors.resize(positions.size(), glm::vec3{0, 0, 0});
+
         assert(positions.size() == colors.size());
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;

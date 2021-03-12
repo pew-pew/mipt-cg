@@ -107,153 +107,39 @@ int main()
     glViewport(0, 0, w, h);
   });
 
-  Mesh teapot = loadSimpleObj("./data/teapot.obj");
-  Mesh cube = genCube();
-  Mesh plane = genXZPlane();
-  std::vector<glm::quat> plane_rots = {glm::quat()};
-  for (float rot : {0., 0.25, 0.5, 0.75})
-    plane_rots.push_back(
-      glm::angleAxis(glm::two_pi<float>() * rot, glm::vec3(0, 1, 0))
-      * glm::angleAxis(glm::half_pi<float>(), glm::vec3{1, 0, 0})
-    );
-
-  uint shaderProgram = createShaderProgram("./shaders/vertex.glsl", "./shaders/fragment.glsl");
-  uint shaderProgram2 = createShaderProgram("./shaders/vertex2.glsl", "./shaders/fragment.glsl");
-  int transLoc = glGetUniformLocation(shaderProgram, "trans");
-  int alphaLoc = glGetUniformLocation(shaderProgram, "alpha");
-  int transLoc2 = glGetUniformLocation(shaderProgram2, "trans");
-  int alphaLoc2 = glGetUniformLocation(shaderProgram2, "alpha");
-
-  glm::vec3 pos = {2, 2, 6};
-  glm::quat dir;
-  double trackT = 0;
-  static double lastT = glfwGetTime();
-  static bool cameraOnTrack = true;
-  static float lastKeyT = lastT;
-  glfwSetKeyCallback(window, [](GLFWwindow *win, int key, int scancode, int action, int mods) {
-    cameraOnTrack = false;
-    lastKeyT = lastT;
-    // if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
-    //   cameraOnTrack = !cameraOnTrack;
-    // }
+  Mesh triangle_left = Mesh::fromPosColor({
+    { 0.3, 0.0, 0.0},
+    {-0.5, 0.5, 0.0},
+    {-0.5,-0.5, 0.0},
+  });
+  Mesh triangle_right = Mesh::fromPosColor({
+    {-0.3, 0.0, 0.0},
+    { 0.5, 0.5, 0.0},
+    { 0.5,-0.5, 0.0},
   });
 
-  auto handleControls = [&]() {
-    constexpr glm::vec3
-      up{0, 1, 0},
-      right{1, 0, 0},
-      forward{0, 0, -1};
+  uint shaderProgramRed = createShaderProgram("./shaders/vertex.glsl", "./shaders/fragment_red.glsl");
+  uint shaderProgramBlue = createShaderProgram("./shaders/vertex.glsl", "./shaders/fragment_blue.glsl");
 
-    double t = glfwGetTime();
-    float dt = t - lastT;
-    lastT = t;
-
-    if (lastT - lastKeyT > 2)
-      cameraOnTrack = true;
-
-    if (cameraOnTrack) {
-      trackT += dt;
-      glm::quat rot = glm::angleAxis((float)trackT / 2, glm::vec3{0, 1, 0});
-      glm::vec3 cameraPos = rot * glm::vec3{0, 3, 6};
-      glm::quat cameraDir = rot * glm::angleAxis(-glm::pi<float>() / 6, glm::vec3{1, 0, 0});
-      float decay = 0.05;
-      pos = glm::mix(pos, cameraPos, decay);
-      dir = glm::slerp(dir, cameraDir, decay);
-      return;
-    }
-
-    float move_speed = 2;
-    float rot_speed = 2;
-
-    glm::vec3 delta;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-      delta += right;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-      delta += -right;
-
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-      delta += forward;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-      delta += -forward;
-
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-      delta += up;
-    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-      delta += -up;
-    pos += dir * delta * dt * move_speed;
-
-    float rot = dt * rot_speed;
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-      dir = glm::rotate(dir, -rot, up);
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-      dir = glm::rotate(dir, rot, up);
-
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-      dir = glm::rotate(dir, rot, right);
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-      dir = glm::rotate(dir, -rot, right);
-
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-      dir = glm::rotate(dir, rot, forward);
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-      dir = glm::rotate(dir, -rot, forward);
-  };
-
-  auto drawScene = [&]() {
-    glm::mat4 viewproj = (
-      glm::perspective<float>(glm::radians(60.), (float)width / height, 0.01, 10)
-      * glm::lookAt(pos, pos + glm::mat3(dir) * glm::vec3{0, 0, -1}, glm::mat3(dir) * glm::vec3{0, 1, 0})
-    );
-    glm::mat4 trans;
-
-    glUseProgram(shaderProgram);
-    trans = viewproj;
-    glUniformMatrix4fv(transLoc, 1, false, glm::value_ptr(trans));
-    glUniform1f(alphaLoc, 1);
-    cube.draw();
-
-    glUseProgram(shaderProgram2);
-    trans = viewproj * glm::rotate((float)lastT, glm::vec3{0, 1, 0}) * glm::translate(glm::vec3{0, 1, 0}) * glm::scale(glm::vec3{0.1, 0.1, 0.1});
-    glUniformMatrix4fv(transLoc2, 1, false, glm::value_ptr(trans));
-    glUniform1f(alphaLoc2, 1);
-    teapot.draw();
-
-    std::vector<glm::mat4> plane_transforms;
-    for (glm::quat rot : plane_rots)
-      plane_transforms.push_back(
-        viewproj * glm::translate(glm::vec3{0, -1, 0}) * glm::mat4(rot)
-        * glm::scale(glm::vec3{1.5f, 1.5f, 1.5f}) * glm::translate(glm::vec3{0, -1, 0})
-      );
-
-    auto key = [&pos](const glm::mat4 &m) {
-      glm::vec4 final = m * glm::vec4{0, 0, 0, 1};
-      return -(final.z / final.w);
-    };
-
-    std::sort(plane_transforms.begin(), plane_transforms.end(), [&key](const glm::mat4 &a, const glm::mat4 &b) {
-      return key(a) < key(b);
-    });
-
-    glUseProgram(shaderProgram);
-    glUniform1f(alphaLoc, 0.5);
-    for (glm::mat4 planetrans : plane_transforms) {
-      trans = planetrans;
-      glUniformMatrix4fv(transLoc, 1, false, glm::value_ptr(trans));
-      plane.draw();
-    }
-  };
-
-  glEnable(GL_DEPTH_TEST);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
-// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
 
   static std::function<void()> loop = [&]() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    handleControls();
-    drawScene();
+    bool red_first = (std::fmod(glfwGetTime(), 2.0) < 1.0);
+    if (red_first) {
+      glUseProgram(shaderProgramRed);
+      triangle_left.draw();
+      glUseProgram(shaderProgramBlue);
+      triangle_right.draw();
+    } else {
+      glUseProgram(shaderProgramBlue);
+      triangle_right.draw();
+      glUseProgram(shaderProgramRed);
+      triangle_left.draw();
+    }
 
     glfwSwapBuffers(window);
     glfwPollEvents();
