@@ -161,11 +161,13 @@ Mesh loadSimpleObj(std::string path) {
                 //     (float)(bool)(i % 3 == 2),
                 // }
             });
-        } else {
-            assert(kind == "f");
+        } else if (kind == "f") {
+            std::string s;
             for (int i = 0; i < 3; i++) {
                 indices.push_back(0);
-                fin >> indices.back();
+                fin >> s;
+                int j = s.find("/");
+                indices.back() = std::atoi(s.substr(0, j).c_str());
                 indices.back()--;
             }
         }
