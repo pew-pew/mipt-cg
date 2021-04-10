@@ -1,25 +1,9 @@
-// #version 330 core
+#version 330 core
 
-// layout (location = 0) in vec3 pos;
-// layout (location = 1) in vec3 inColor;
-// flat out vec3 color;
-// uniform mat4 trans;
+layout(location = 0) in vec3 pos;
 
-// void main() {
-//    gl_Position = trans * vec4(pos.x, pos.y, pos.z, 1.0);
-//    color = inColor;
-// }
+uniform mat4 MVP;
 
-
-#version 100
-
-attribute vec3 pos;
-attribute vec3 inColor;
-varying vec3 color;
-uniform mat4 trans;
-
-void main()
-{                           
-   gl_Position = trans * vec4(pos.x, pos.y, pos.z, 1.0);
-   color = inColor;
-}                           
+void main() {
+   gl_Position = MVP * vec4(pos, 1);
+}

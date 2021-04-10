@@ -1,23 +1,8 @@
-// #version 330 core
+#version 330 core
 
-// in vec3 color;
-// out vec4 FragColor;
-// uniform float alpha;
-
-// void main() {
-//    // FragColor = vec4(gl_FragCoord.z, 0, 0, 1);
-//    FragColor = vec4((alpha != 1 ? vec3(0) : color), alpha);
-// }
-
-
-#version 100
-
-precision mediump float;                   
-
-varying vec3 color;
-uniform float alpha;
+out vec3 color;
 
 void main()
 {
-   gl_FragColor = vec4(color, alpha);
-}                                          
+   color = vec3(0.05, 0.5, 0.6) * gl_FragCoord.z / gl_FragCoord.w / 2.0 * gl_FragCoord.z / gl_FragCoord.w / 2.0;
+}
