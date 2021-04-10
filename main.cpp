@@ -113,8 +113,12 @@ struct AngleTransform {
   float vertical_angle;
 
   [[nodiscard]] glm::quat getDir() const {
-    return glm::angleAxis(vertical_angle, glm::vec3{1, 0, 0})
-            * glm::angleAxis(horizontal_angle, glm::vec3{0, 1, 0});
+    return glm::angleAxis(-horizontal_angle, glm::vec3{0, 1, 0})
+            * glm::angleAxis(vertical_angle, glm::vec3{1, 0, 0});
+  }
+
+  [[nodiscard]] glm::quat getForwardDir() const {
+    return glm::angleAxis(-horizontal_angle, glm::vec3{0, 1, 0});
   }
 };
 
@@ -153,7 +157,7 @@ class Scene {
 
     glm::vec3 enemy_pos = (
         player.pos +
-        player.getDir() * glm::angleAxis(ang, glm::vec3{0, 1, 0}) * glm::vec3{0, 0, -1} * dist
+        player.getForwardDir() * glm::angleAxis(ang, glm::vec3{0, 1, 0}) * glm::vec3{0, 0, -1} * dist
     );
 
     float enemy_rot = std::uniform_real_distribution(0.0f, glm::pi<float>() * 2)(random_engine_);
@@ -179,13 +183,11 @@ class Scene {
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
       delta += -forward;
 
-    player.pos += player.getDir() * delta * (float)elapsed_time * PLAYER_MOVE_SPEED;
-
     double x_cursor_prev = x_cursor_;
     double y_cursor_prev = y_cursor_;
     glfwGetCursorPos(window, &x_cursor_, &y_cursor_);
     double horizontal_angle_shift = glm::pi<double>() * 2 * (std::fmod(x_cursor_ - x_cursor_prev, X_FULL_CURSOR_ROTATION) / X_FULL_CURSOR_ROTATION);
-    double vertical_angle_shift = glm::pi<double>() * 2 * (std::fmod(y_cursor_ - y_cursor_prev, Y_FULL_CURSOR_ROTATION) / Y_FULL_CURSOR_ROTATION);
+    double vertical_angle_shift = -glm::pi<double>() * 2 * (std::fmod(y_cursor_ - y_cursor_prev, Y_FULL_CURSOR_ROTATION) / Y_FULL_CURSOR_ROTATION);
     player.horizontal_angle += (float)horizontal_angle_shift;
     if (player.vertical_angle + vertical_angle_shift > MAX_PLAYER_VERTICAL_ANGLE) {
       player.vertical_angle = MAX_PLAYER_VERTICAL_ANGLE;
@@ -194,11 +196,14 @@ class Scene {
     } else {
       player.vertical_angle += (float)vertical_angle_shift;
     }
+
+    player.pos += player.getForwardDir() * delta * (float)elapsed_time * PLAYER_MOVE_SPEED;
+
   }
 
  private:
-  static constexpr double SPAWN_DELAY = 1.0 / 5;
-  static constexpr float PLAYER_MOVE_SPEED = 2;
+  static constexpr double SPAWN_DELAY = 1.0;
+  static constexpr float PLAYER_MOVE_SPEED = 3;
   static constexpr double X_FULL_CURSOR_ROTATION = 1000;
   static constexpr double Y_FULL_CURSOR_ROTATION = 1000;
   static constexpr double MIN_PLAYER_VERTICAL_ANGLE = -glm::pi<double>() / 2;
@@ -235,7 +240,7 @@ int main()
   double last_time = 0;
   double elapsed_time = 0;
 
-  glm::vec3 player_camera_shift{0, 1, 0};
+  glm::vec3 player_camera_shift{0, 1.5, 0};
 
   double x_cursor, y_cursor;
   glfwGetCursorPos(window, &x_cursor, &y_cursor);
