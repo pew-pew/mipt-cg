@@ -89,6 +89,11 @@ void initGlewGLFW() {
 
   glfwMakeContextCurrent(window);
 
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  if (glfwRawMouseMotionSupported()) {
+    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+  }
+
   if (glewInit() != GLEW_OK) {
     fprintf(stderr, "Failed to initialize GLEW\n");
     getchar();
@@ -97,30 +102,47 @@ void initGlewGLFW() {
   }
 }
 
-struct Transform {
+struct QuatTransform {
   glm::vec3 pos;
   glm::quat dir;
 };
 
+struct AngleTransform {
+  glm::vec3 pos;
+  float horizontal_angle;
+  float vertical_angle;
+
+  [[nodiscard]] glm::quat getDir() const {
+    return glm::angleAxis(vertical_angle, glm::vec3{1, 0, 0})
+            * glm::angleAxis(horizontal_angle, glm::vec3{0, 1, 0});
+  }
+};
+
 class Scene {
  public:
-  explicit Scene(int64_t random_seed) : random_engine_(random_seed) {
+  Scene(int64_t random_seed,
+        double x_cursor_start_pos,
+        double y_cursor_start_pos)
+        : random_engine_(random_seed)
+        , x_cursor_(x_cursor_start_pos)
+        , y_cursor_(y_cursor_start_pos) {
   }
 
  public:
-  Transform player{
-      {0, 2, 0}, glm::angleAxis(0.0f, glm::vec3{0, 1, 0})
+  AngleTransform player{
+      {0, 2, 0}, 0.0f, 0.0f
   };
-  std::vector<Transform> enemies;
+  std::vector<QuatTransform> enemies;
 
-  void update(double elapsedTime) {
-    spawnEnemies(elapsedTime);
+  void update(double elapsed_time) {
+    movePlayer(elapsed_time);
+    spawnEnemies(elapsed_time);
   }
 
  private:
   void spawnEnemies(double elapsed_time) {
     elapsed_since_last_spawn_ += elapsed_time;
-    if (elapsed_since_last_spawn_ < SPAWN_DELAY || enemies.size() >= 100) {
+    if (elapsed_since_last_spawn_ < SPAWN_DELAY || enemies.size() >= MAX_ENEMIES) {
       return;
     }
 
@@ -131,65 +153,61 @@ class Scene {
 
     glm::vec3 enemy_pos = (
         player.pos +
-        player.dir * glm::angleAxis(ang, glm::vec3{0, 1, 0}) * glm::vec3{0, 0, -1} * dist
+        player.getDir() * glm::angleAxis(ang, glm::vec3{0, 1, 0}) * glm::vec3{0, 0, -1} * dist
     );
 
     float enemy_rot = std::uniform_real_distribution(0.0f, glm::pi<float>() * 2)(random_engine_);
     glm::quat enemy_dir = glm::angleAxis(enemy_rot, glm::vec3{0, 1, 0});
 
-    enemies.push_back(Transform{enemy_pos, enemy_dir});
+    enemies.push_back(QuatTransform{enemy_pos, enemy_dir});
   }
 
-//  void movePlayer() {
-//    constexpr glm::vec3
-//      up{0, 1, 0},
-//      right{1, 0, 0},
-//      forward{0, 0, -1};
-//
-//    double t = glfwGetTime();
-//    float dt = t - lastT;
-//    lastT = t;
-//
-//    glm::vec3 delta;
-//    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-//      delta += right;
-//    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-//      delta += -right;
-//
-//    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-//      delta += forward;
-//    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-//      delta += -forward;
-//
-//    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-//      delta += up;
-//    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-//      delta += -up;
-//    pos += dir * delta * dt * PLAYER_MOVE_SPEED;
-//
-//    float rot = dt * PLAYER_ROTATION_SPEED;
-//    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-//      dir = glm::rotate(dir, -rot, up);
-//    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-//      dir = glm::rotate(dir, rot, up);
-//
-//    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-//      dir = glm::rotate(dir, rot, right);
-//    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-//      dir = glm::rotate(dir, -rot, right);
-//
-//    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-//      dir = glm::rotate(dir, rot, forward);
-//    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-//      dir = glm::rotate(dir, -rot, forward);
-//  }
+  void movePlayer(double elapsed_time) {
+    constexpr glm::vec3
+      up{0, 1, 0},
+      right{1, 0, 0},
+      forward{0, 0, -1};
+
+    glm::vec3 delta;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+      delta += right;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+      delta += -right;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+      delta += forward;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+      delta += -forward;
+
+    player.pos += player.getDir() * delta * (float)elapsed_time * PLAYER_MOVE_SPEED;
+
+    double x_cursor_prev = x_cursor_;
+    double y_cursor_prev = y_cursor_;
+    glfwGetCursorPos(window, &x_cursor_, &y_cursor_);
+    double horizontal_angle_shift = glm::pi<double>() * 2 * (std::fmod(x_cursor_ - x_cursor_prev, X_FULL_CURSOR_ROTATION) / X_FULL_CURSOR_ROTATION);
+    double vertical_angle_shift = glm::pi<double>() * 2 * (std::fmod(y_cursor_ - y_cursor_prev, Y_FULL_CURSOR_ROTATION) / Y_FULL_CURSOR_ROTATION);
+    player.horizontal_angle += (float)horizontal_angle_shift;
+    if (player.vertical_angle + vertical_angle_shift > MAX_PLAYER_VERTICAL_ANGLE) {
+      player.vertical_angle = MAX_PLAYER_VERTICAL_ANGLE;
+    } else if (player.vertical_angle + vertical_angle_shift < MIN_PLAYER_VERTICAL_ANGLE) {
+      player.vertical_angle = MIN_PLAYER_VERTICAL_ANGLE;
+    } else {
+      player.vertical_angle += (float)vertical_angle_shift;
+    }
+  }
 
  private:
   static constexpr double SPAWN_DELAY = 1.0 / 5;
   static constexpr float PLAYER_MOVE_SPEED = 2;
-  static constexpr float PLAYER_ROTATION_SPEED = 2;
+  static constexpr double X_FULL_CURSOR_ROTATION = 1000;
+  static constexpr double Y_FULL_CURSOR_ROTATION = 1000;
+  static constexpr double MIN_PLAYER_VERTICAL_ANGLE = -glm::pi<double>() / 2;
+  static constexpr double MAX_PLAYER_VERTICAL_ANGLE = glm::pi<double>() / 2;
+  static constexpr int MAX_ENEMIES = 10;
 
   std::default_random_engine random_engine_;
+  double x_cursor_;
+  double y_cursor_;
   double elapsed_since_last_spawn_{0};
 };
 
@@ -217,24 +235,28 @@ int main()
   double last_time = 0;
   double elapsed_time = 0;
 
-  Scene scene(42);
-  double wideness = 0.1;
+  glm::vec3 player_camera_shift{0, 1, 0};
+
+  double x_cursor, y_cursor;
+  glfwGetCursorPos(window, &x_cursor, &y_cursor);
+
+  Scene scene(42, x_cursor, y_cursor);
   auto drawScene = [&]() {
+    glm::vec3 player_camera_pos = scene.player.pos + player_camera_shift;
     glm::mat4 viewproj = (
-      glm::perspective<float>(glm::radians(90.), (float)width / height, 0.01, 10)
-      * glm::lookAt(scene.player.pos,
-                    scene.player.pos + scene.player.dir * glm::vec3{0, 0, -1},
-                    scene.player.dir * glm::vec3{0, 1, 0})
+      glm::perspective<float>(glm::radians(60.), (float)width / height, 0.01, 100)
+      * glm::lookAt(player_camera_pos,
+                    player_camera_pos + scene.player.getDir() * glm::vec3{0, 0, -1},
+                    scene.player.getDir() * glm::vec3{0, 1, 0})
     );
     glm::mat4 trans;
 
     glUseProgram(shader_program);
-    wideness += 0.005;
     for (auto& enemy : scene.enemies) {
       glm::mat4 MVP = viewproj
           * glm::translate(enemy.pos)
           * glm::mat4(enemy.dir)
-          * glm::scale(glm::vec3{wideness, 1, wideness});
+          * glm::scale(glm::vec3{1, 1, 1});
 
       glUniformMatrix4fv(mvp_matrix_id, 1, GL_FALSE, glm::value_ptr(MVP));
       roma.draw();
