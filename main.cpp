@@ -35,6 +35,7 @@ GLFWwindow* window;
 #include <glm/gtx/transform.hpp>
 using namespace glm;
 
+#include "utils.hpp"
 #include "shader.hpp"
 #include "mesh.hpp"
 
@@ -90,9 +91,9 @@ void initGlewGLFW() {
   glfwMakeContextCurrent(window);
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-  if (glfwRawMouseMotionSupported()) {
-    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-  }
+  // if (glfwRawMouseMotionSupported()) {
+  //   glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+  // }
 
   if (glewInit() != GLEW_OK) {
     fprintf(stderr, "Failed to initialize GLEW\n");
@@ -122,14 +123,57 @@ struct AngleTransform {
   }
 };
 
+/**
+ * GLFW wrapper but robust to window swithing/alt-tabs/etc 
+ */
+class MouseInput {
+public:
+  static void initGlobal(MouseInput &inp) {
+    static MouseInput& globalGuy = inp;
+    glfwSetCursorPosCallback(window, [](GLFWwindow *window, double x, double y) {
+      globalGuy.onCursorPos(x, y);
+    });
+    glfwSetCursorEnterCallback(window, [](GLFWwindow *window, int enter) {
+      globalGuy.onEnterLeave(enter);
+    });
+  }
+
+  glm::vec2 getPos() {
+    return cam;
+  }
+
+private:
+  glm::vec2 cam{0, 0};
+  std::optional<glm::vec2> cursor = std::nullopt;
+  bool is_in_window = false;
+
+  void onEnterLeave(bool entered) {
+    is_in_window = entered;
+    cursor = std::nullopt;
+    // glfwGetCursorPos(window, &x, &y); // has old value
+  }
+
+  void onCursorPos(double nx, double ny) {
+    if (!is_in_window)
+      return;
+    glm::vec2 cursor_new{nx, ny};
+    if (cursor.has_value())
+      cam += cursor_new - cursor.value();
+    cursor = cursor_new;
+  }
+};
+
+MouseInput mouse_input;
+
 class Scene {
  public:
-  Scene(int64_t random_seed,
-        double x_cursor_start_pos,
-        double y_cursor_start_pos)
+  MouseInput *inp_;
+
+  Scene(int64_t random_seed)
         : random_engine_(random_seed)
-        , x_cursor_(x_cursor_start_pos)
-        , y_cursor_(y_cursor_start_pos) {
+        , x_cursor_(mouse_input.getPos().x)
+        , y_cursor_(mouse_input.getPos().y)
+  {
   }
 
  public:
@@ -183,22 +227,17 @@ class Scene {
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
       delta += -forward;
 
-    double x_cursor_prev = x_cursor_;
-    double y_cursor_prev = y_cursor_;
-    glfwGetCursorPos(window, &x_cursor_, &y_cursor_);
-    double horizontal_angle_shift = glm::pi<double>() * 2 * (std::fmod(x_cursor_ - x_cursor_prev, X_FULL_CURSOR_ROTATION) / X_FULL_CURSOR_ROTATION);
-    double vertical_angle_shift = -glm::pi<double>() * 2 * (std::fmod(y_cursor_ - y_cursor_prev, Y_FULL_CURSOR_ROTATION) / Y_FULL_CURSOR_ROTATION);
-    player.horizontal_angle += (float)horizontal_angle_shift;
-    if (player.vertical_angle + vertical_angle_shift > MAX_PLAYER_VERTICAL_ANGLE) {
-      player.vertical_angle = MAX_PLAYER_VERTICAL_ANGLE;
-    } else if (player.vertical_angle + vertical_angle_shift < MIN_PLAYER_VERTICAL_ANGLE) {
-      player.vertical_angle = MIN_PLAYER_VERTICAL_ANGLE;
-    } else {
-      player.vertical_angle += (float)vertical_angle_shift;
-    }
+    double dx = mouse_input.getPos().x - x_cursor_;
+    double dy = mouse_input.getPos().y - y_cursor_;
+    x_cursor_ = mouse_input.getPos().x;
+    y_cursor_ = mouse_input.getPos().y;
+    double horizontal_angle_shift = glm::pi<double>() * 2 * dx / X_FULL_CURSOR_ROTATION;
+    double vertical_angle_shift = -glm::pi<double>() * 2 * dy / Y_FULL_CURSOR_ROTATION;
 
+    player.horizontal_angle += horizontal_angle_shift;
+    player.vertical_angle = glm::clamp(player.vertical_angle + vertical_angle_shift, MIN_PLAYER_VERTICAL_ANGLE, MAX_PLAYER_VERTICAL_ANGLE);
+    
     player.pos += player.getForwardDir() * delta * (float)elapsed_time * PLAYER_MOVE_SPEED;
-
   }
 
  private:
@@ -213,7 +252,7 @@ class Scene {
   std::default_random_engine random_engine_;
   double x_cursor_;
   double y_cursor_;
-  double elapsed_since_last_spawn_{0};
+  double elapsed_since_last_spawn_{SPAWN_DELAY};
 };
 
 int main()
@@ -230,8 +269,10 @@ int main()
 
   uint shader_program = createShaderProgram("./shaders/vertex.glsl", "./shaders/fragment.glsl");
   int mvp_matrix_id = glGetUniformLocation(shader_program, "MVP");
+  int texture_id = glGetUniformLocation(shader_program, "tex");
 
   Mesh roma = loadSimpleObj("./data/roma_smol.obj");
+  uint texture_handle = loadTexture("./data/roma_smol.jpg");
 
   // Fixed FPS
   int targetFPS = 60;
@@ -242,10 +283,9 @@ int main()
 
   glm::vec3 player_camera_shift{0, 1.5, 0};
 
-  double x_cursor, y_cursor;
-  glfwGetCursorPos(window, &x_cursor, &y_cursor);
+  MouseInput::initGlobal(mouse_input);
+  Scene scene(42);
 
-  Scene scene(42, x_cursor, y_cursor);
   auto drawScene = [&]() {
     glm::vec3 player_camera_pos = scene.player.pos + player_camera_shift;
     glm::mat4 viewproj = (
@@ -257,6 +297,11 @@ int main()
     glm::mat4 trans;
 
     glUseProgram(shader_program);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture_handle);
+    glUniform1i(texture_id, 0);
+
     for (auto& enemy : scene.enemies) {
       glm::mat4 MVP = viewproj
           * glm::translate(enemy.pos)
