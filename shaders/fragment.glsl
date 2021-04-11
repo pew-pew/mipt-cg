@@ -1,8 +1,12 @@
 #version 330 core
 
-out vec3 color;
+in vec2 tex_coord;
+
+out vec4 color;
+
+uniform sampler2D tex;
 
 void main()
 {
-   color = vec3(0.05, 0.5, 0.6) * gl_FragCoord.z / gl_FragCoord.w / 2.0 * gl_FragCoord.z / gl_FragCoord.w / 2.0;
+   color = texture(tex, tex_coord);
 }
