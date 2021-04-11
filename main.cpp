@@ -18,6 +18,7 @@ GLFWwindow* window;
 #include <iostream>
 #include <thread>
 #include <functional>
+#include <optional>
 #include <vector>
 #include <chrono>
 #include <algorithm>
