@@ -198,15 +198,19 @@ Mesh loadSimpleObj(std::string path) {
         fin >> vert_indices;
         
         Mesh::Vertex v = {};
-        assert(std::count(vert_indices.begin(), vert_indices.end(), '/') == 2); // haha
-        size_t s1 = vert_indices.find('/'), s2 = vert_indices.rfind('/');
-        int pos_idx = std::atoi(vert_indices.substr(0, s1).c_str());
-        int uv_idx = std::atoi(vert_indices.substr(s1 + 1, s2 - s1 - 1).c_str());
-        --pos_idx, --uv_idx;
+        size_t s1 = vert_indices.find('/');
+        int pos_idx = std::atoi(vert_indices.substr(0, s1).c_str()) - 1;
         assert(pos_idx < positions.size());
-        assert(uv_idx < uvs.size());
         v.pos = positions[pos_idx];
-        v.tex_coord = uvs[uv_idx];
+
+        if (s1 != std::string::npos) {
+          size_t s2 = vert_indices.find('/', s1 + 1);
+          if (s2 == std::string::npos)
+            s2 = vert_indices.size();
+          int uv_idx = std::atoi(vert_indices.substr(s1 + 1, s2 - s1 - 1).c_str()) - 1;
+          assert(uv_idx < uvs.size());
+          v.tex_coord = uvs[uv_idx];
+        }
 
         vertices.push_back(v);
         indices.push_back(indices.size());
