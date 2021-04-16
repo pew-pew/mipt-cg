@@ -224,12 +224,6 @@ class Scene {
     float enemy_rot = std::uniform_real_distribution(0.0f, glm::pi<float>() * 2)(random_engine_) - glm::pi<float>();
     glm::quat enemy_dir = glm::angleAxis(enemy_rot, glm::vec3{0, 1, 0});
 
-    if (enemies.size()) {
-      auto qwe = enemies.back();
-      enemy_pos = (qwe.pos - qwe.dir * FORWARD * 0.5f);
-      enemy_dir = qwe.dir * glm::angleAxis(enemy_rot / 10, glm::vec3{0, 1, 0});
-    }
-
     enemies.push_back(QuatTransform{enemy_pos, enemy_dir});
   }
 
@@ -294,8 +288,8 @@ class Scene {
   }
 
  private:
-  static constexpr double SPAWN_DELAY = 0.3;
-  static constexpr int MAX_ENEMIES = 100;
+  static constexpr double SPAWN_DELAY = 1.0;
+  static constexpr int MAX_ENEMIES = 10;
 
   static constexpr glm::vec3
       UP{0, 1, 0},
@@ -373,13 +367,8 @@ int main()
     glBindTexture(GL_TEXTURE_2D, roma_texture_handle);
     glUniform1i(texture_id, 0);
 
-    int i =0;
     for (auto& enemy_trans : scene.enemies) {
-      i++;
       glm::mat4 MVP = viewproj * enemy_trans.getMat();
-      if ((i % 2) ^ ((int)(current_time * 2) % 2 == 0))
-        MVP = MVP * glm::scale(glm::vec3{-1, 1, 1});
-
       glUniformMatrix4fv(mvp_matrix_id, 1, GL_FALSE, glm::value_ptr(MVP));
       roma.draw();
     }

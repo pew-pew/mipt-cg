@@ -3,12 +3,11 @@
 #include <cassert>
 #include <GL/glew.h>
 
-uint loadTexture(std::string path, bool repeat=false) {
+uint loadTexture(const std::string& path, bool repeat=false) {
   stbi_set_flip_vertically_on_load(true);
   int width, height, nrChannels;
   unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0);
   assert(data);
-  std::cout << data << std::endl;
 
   uint texI;
   glGenTextures(1, &texI);
