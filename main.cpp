@@ -323,7 +323,11 @@ int main()
   });
 
   uint shader_program = createShaderProgram("./shaders/vertex.glsl", "./shaders/fragment.glsl");
-  int mvp_matrix_id = glGetUniformLocation(shader_program, "MVP");
+  int m_matrix_id = glGetUniformLocation(shader_program, "M");
+  int v_matrix_id = glGetUniformLocation(shader_program, "V");
+  int p_matrix_id = glGetUniformLocation(shader_program, "P");
+  int light_pos_id = glGetUniformLocation(shader_program, "light_pos");
+  int ambient_id = glGetUniformLocation(shader_program, "ambientK");
   int texture_id = glGetUniformLocation(shader_program, "tex");
 
   Mesh roma = loadSimpleObj("./data/roma_smol.obj");
@@ -353,13 +357,18 @@ int main()
 
   auto drawScene = [&]() {
     glm::vec3 player_camera_pos = scene.player.pos + Scene::PERSON_HEAD;
-    glm::mat4 viewproj = (
-      glm::perspective<float>(glm::radians(60.), (float)width / height, 0.01, 100)
-      * glm::lookAt(player_camera_pos,
-                    player_camera_pos + scene.player.getDir() * glm::vec3{0, 0, -1},
-                    scene.player.getDir() * glm::vec3{0, 1, 0})
-    );
-    glm::mat4 trans;
+    glm::mat4 view = glm::lookAt(player_camera_pos,
+                                     player_camera_pos + scene.player.getDir() * glm::vec3{0, 0, -1},
+                                     scene.player.getDir() * glm::vec3{0, 1, 0});
+    glm::mat4 projection = glm::perspective<float>(glm::radians(60.),
+                                                   (float)width / height,
+                                                   0.01, 100);
+    glUniformMatrix4fv(v_matrix_id, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(p_matrix_id, 1, GL_FALSE, glm::value_ptr(projection));
+    glm::vec3 light_pos = player_camera_pos;
+    if (!scene.projectiles.empty())
+      light_pos = scene.projectiles.back().pos;
+    glUniform3fv(light_pos_id, 1, glm::value_ptr(light_pos));
 
     glUseProgram(shader_program);
 
@@ -367,23 +376,27 @@ int main()
     glBindTexture(GL_TEXTURE_2D, roma_texture_handle);
     glUniform1i(texture_id, 0);
 
+    glUniform1f(ambient_id, 0.1f);
     for (auto& enemy_trans : scene.enemies) {
-      glm::mat4 MVP = viewproj * enemy_trans.getMat();
-      glUniformMatrix4fv(mvp_matrix_id, 1, GL_FALSE, glm::value_ptr(MVP));
+      glm::mat4 model = enemy_trans.getMat();
+      glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
       roma.draw();
     }
 
+    glUniform1f(ambient_id, 1.0f);
+
     glBindTexture(GL_TEXTURE_2D, projectile_texture_handle);
     for (auto& proj_trans : scene.projectiles) {
-      glm::mat4 MVP = viewproj
-          * proj_trans.getMat()
+      glm::mat4 model = (
+          proj_trans.getMat()
           * glm::rotate(
               (float)current_time * 10,
               glm::vec3{0.1, 0, 1}
               )
-          * glm::scale(glm::vec3{1., 1., 1.} / 5.0f);
+          * glm::scale(glm::vec3{1., 1., 1.} / 5.0f)
+      );
 
-      glUniformMatrix4fv(mvp_matrix_id, 1, GL_FALSE, glm::value_ptr(MVP));
+      glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
       projectile.draw();
     }
   };
