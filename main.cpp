@@ -18,6 +18,7 @@ GLFWwindow* window;
 #include <iostream>
 #include <thread>
 #include <functional>
+#include <optional>
 #include <vector>
 #include <chrono>
 #include <algorithm>
@@ -106,6 +107,10 @@ void initGlewGLFW() {
 struct QuatTransform {
   glm::vec3 pos;
   glm::quat dir;
+
+  glm::mat4 getMat() {
+    return glm::translate(pos) * glm::mat4(dir);
+  }
 };
 
 struct AngleTransform {
@@ -181,20 +186,32 @@ class Scene {
       {0, 2, 0}, 0.0f, 0.0f
   };
   std::vector<QuatTransform> enemies;
+  std::vector<QuatTransform> projectiles;
+
+  static constexpr glm::vec3 PERSON_HEAD{0, 1.5, 0};
 
   void update(double elapsed_time) {
     movePlayer(elapsed_time);
     spawnEnemies(elapsed_time);
+    moveProjectiles(elapsed_time);
+    checkCollisions();
+  }
+
+  void spawnProjectile() {
+    projectiles.push_back(QuatTransform{
+        player.pos + PERSON_HEAD + player.getDir() * FORWARD * 0.2f,
+        player.getDir()
+    });
   }
 
  private:
   void spawnEnemies(double elapsed_time) {
-    elapsed_since_last_spawn_ += elapsed_time;
-    if (elapsed_since_last_spawn_ < SPAWN_DELAY || enemies.size() >= MAX_ENEMIES) {
+    elapsed_since_last_enemy_spawn_ += elapsed_time;
+    if (elapsed_since_last_enemy_spawn_ < SPAWN_DELAY || enemies.size() >= MAX_ENEMIES) {
       return;
     }
 
-    elapsed_since_last_spawn_ = 0;
+    elapsed_since_last_enemy_spawn_ = 0;
     float dist = std::uniform_real_distribution(2.0f, 5.0f)(random_engine_);
     float wing = glm::pi<float>() * 2 * 0.2;
     float ang = std::uniform_real_distribution(-wing, +wing)(random_engine_);
@@ -204,28 +221,26 @@ class Scene {
         player.getForwardDir() * glm::angleAxis(ang, glm::vec3{0, 1, 0}) * glm::vec3{0, 0, -1} * dist
     );
 
-    float enemy_rot = std::uniform_real_distribution(0.0f, glm::pi<float>() * 2)(random_engine_);
+    float enemy_rot = std::uniform_real_distribution(0.0f, glm::pi<float>() * 2)(random_engine_) - glm::pi<float>();
     glm::quat enemy_dir = glm::angleAxis(enemy_rot, glm::vec3{0, 1, 0});
 
     enemies.push_back(QuatTransform{enemy_pos, enemy_dir});
   }
 
   void movePlayer(double elapsed_time) {
-    constexpr glm::vec3
-      up{0, 1, 0},
-      right{1, 0, 0},
-      forward{0, 0, -1};
-
     glm::vec3 delta;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-      delta += right;
+      delta += RIGHT;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-      delta += -right;
+      delta += -RIGHT;
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-      delta += forward;
+      delta += FORWARD;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-      delta += -forward;
+      delta += -FORWARD;
+
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+      delta *= 0.1;
 
     double dx = mouse_input.getPos().x - x_cursor_;
     double dy = mouse_input.getPos().y - y_cursor_;
@@ -240,19 +255,59 @@ class Scene {
     player.pos += player.getForwardDir() * delta * (float)elapsed_time * PLAYER_MOVE_SPEED;
   }
 
+  void moveProjectiles(double elapsed_time) {
+    for (auto& projectile : projectiles) {
+      projectile.pos += projectile.dir * FORWARD * (float)elapsed_time * PROJECTILE_MOVE_SPEED;
+    }
+  }
+
+  void checkCollisions() {
+    for (size_t ip = 0; ip < projectiles.size(); ip++) {
+      for (size_t ie = 0; ie < enemies.size(); ie++) {
+        if (checkCollision(projectiles[ip].pos, enemies[ie].pos)) {
+          enemies.erase(enemies.begin() + ie);
+          projectiles.erase(projectiles.begin() + ip);
+          ip--;
+          break;
+        }
+      }
+    }
+
+    for (size_t ip = 0; ip < projectiles.size(); ip++) {
+      if (glm::length(projectiles[ip].pos - player.pos) > 100) {
+        projectiles.erase(projectiles.begin() + ip);
+        ip--;
+      }
+    }
+  }
+
+  static bool checkCollision(const glm::vec3& proj_pos, const glm::vec3& enemy_pos) {
+    float top_dist = glm::distance(proj_pos, enemy_pos + PERSON_HEAD);
+    float bot_dist = glm::distance(proj_pos, enemy_pos);
+    return top_dist + bot_dist < 2;
+  }
+
  private:
   static constexpr double SPAWN_DELAY = 1.0;
+  static constexpr int MAX_ENEMIES = 10;
+
+  static constexpr glm::vec3
+      UP{0, 1, 0},
+      RIGHT{1, 0, 0},
+      FORWARD{0, 0, -1};
+
   static constexpr float PLAYER_MOVE_SPEED = 3;
   static constexpr double X_FULL_CURSOR_ROTATION = 1000;
   static constexpr double Y_FULL_CURSOR_ROTATION = 1000;
   static constexpr double MIN_PLAYER_VERTICAL_ANGLE = -glm::pi<double>() / 2;
   static constexpr double MAX_PLAYER_VERTICAL_ANGLE = glm::pi<double>() / 2;
-  static constexpr int MAX_ENEMIES = 10;
+
+  static constexpr float PROJECTILE_MOVE_SPEED = 5;
 
   std::default_random_engine random_engine_;
   double x_cursor_;
   double y_cursor_;
-  double elapsed_since_last_spawn_{SPAWN_DELAY};
+  double elapsed_since_last_enemy_spawn_{SPAWN_DELAY};
 };
 
 int main()
@@ -268,11 +323,18 @@ int main()
   });
 
   uint shader_program = createShaderProgram("./shaders/vertex.glsl", "./shaders/fragment.glsl");
-  int mvp_matrix_id = glGetUniformLocation(shader_program, "MVP");
+  int m_matrix_id = glGetUniformLocation(shader_program, "M");
+  int v_matrix_id = glGetUniformLocation(shader_program, "V");
+  int p_matrix_id = glGetUniformLocation(shader_program, "P");
+  int light_pos_id = glGetUniformLocation(shader_program, "light_pos");
+  int ambient_id = glGetUniformLocation(shader_program, "ambientK");
   int texture_id = glGetUniformLocation(shader_program, "tex");
 
   Mesh roma = loadSimpleObj("./data/roma_smol.obj");
-  uint texture_handle = loadTexture("./data/roma_smol.jpg");
+  uint roma_texture_handle = loadTexture("./data/roma_smol.jpg");
+
+  Mesh projectile = loadSimpleObj("./data/projectile.obj");
+  uint projectile_texture_handle = loadTexture("./data/projectile.jpg", true);
 
   // Fixed FPS
   int targetFPS = 60;
@@ -281,35 +343,61 @@ int main()
   double last_time = 0;
   double elapsed_time = 0;
 
-  glm::vec3 player_camera_shift{0, 1.5, 0};
-
   MouseInput::initGlobal(mouse_input);
   Scene scene(42);
 
+  static auto mouse_click_callback = [&](int button, int action) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+      scene.spawnProjectile();
+  };
+
+  glfwSetMouseButtonCallback(window, [](GLFWwindow* window, int button, int action, int mods) {
+    mouse_click_callback(button, action);
+  });
+
   auto drawScene = [&]() {
-    glm::vec3 player_camera_pos = scene.player.pos + player_camera_shift;
-    glm::mat4 viewproj = (
-      glm::perspective<float>(glm::radians(60.), (float)width / height, 0.01, 100)
-      * glm::lookAt(player_camera_pos,
-                    player_camera_pos + scene.player.getDir() * glm::vec3{0, 0, -1},
-                    scene.player.getDir() * glm::vec3{0, 1, 0})
-    );
-    glm::mat4 trans;
+    glm::vec3 player_camera_pos = scene.player.pos + Scene::PERSON_HEAD;
+    glm::mat4 view = glm::lookAt(player_camera_pos,
+                                     player_camera_pos + scene.player.getDir() * glm::vec3{0, 0, -1},
+                                     scene.player.getDir() * glm::vec3{0, 1, 0});
+    glm::mat4 projection = glm::perspective<float>(glm::radians(60.),
+                                                   (float)width / height,
+                                                   0.01, 100);
+    glUniformMatrix4fv(v_matrix_id, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(p_matrix_id, 1, GL_FALSE, glm::value_ptr(projection));
+    glm::vec3 light_pos = player_camera_pos;
+    if (!scene.projectiles.empty())
+      light_pos = scene.projectiles.back().pos;
+    glUniform3fv(light_pos_id, 1, glm::value_ptr(light_pos));
 
     glUseProgram(shader_program);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_handle);
+    glBindTexture(GL_TEXTURE_2D, roma_texture_handle);
     glUniform1i(texture_id, 0);
 
-    for (auto& enemy : scene.enemies) {
-      glm::mat4 MVP = viewproj
-          * glm::translate(enemy.pos)
-          * glm::mat4(enemy.dir)
-          * glm::scale(glm::vec3{1, 1, 1});
-
-      glUniformMatrix4fv(mvp_matrix_id, 1, GL_FALSE, glm::value_ptr(MVP));
+    glUniform1f(ambient_id, 0.1f);
+    for (auto& enemy_trans : scene.enemies) {
+      glm::mat4 model = enemy_trans.getMat();
+      glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
       roma.draw();
+    }
+
+    glUniform1f(ambient_id, 1.0f);
+
+    glBindTexture(GL_TEXTURE_2D, projectile_texture_handle);
+    for (auto& proj_trans : scene.projectiles) {
+      glm::mat4 model = (
+          proj_trans.getMat()
+          * glm::rotate(
+              (float)current_time * 10,
+              glm::vec3{0.1, 0, 1}
+              )
+          * glm::scale(glm::vec3{1., 1., 1.} / 5.0f)
+      );
+
+      glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
+      projectile.draw();
     }
   };
 

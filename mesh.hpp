@@ -1,10 +1,12 @@
 #pragma once
 
-#include <glm/glm.hpp>
-#include <vector>
-#include <GL/glew.h>
-#include <fstream>
 #include <cassert>
+#include <cstdio>
+#include <fstream>
+#include <vector>
+
+#include <glm/glm.hpp>
+#include <GL/glew.h>
 
 struct Mesh {
   /**
@@ -12,14 +14,16 @@ struct Mesh {
    * 0 - vec3 position
    * 1 - vec3 color
    * 2 - vec2 texture coords
+   * 3 - vec3 normals
    */
 
   struct Vertex {
     glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 tex_coord;
+    glm::vec3 normal;
   };
-  static_assert(sizeof(Vertex) == sizeof(float) * 8);
+  static_assert(sizeof(Vertex) == sizeof(float) * 11);
 
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices; // not used wisely
@@ -54,11 +58,13 @@ struct Mesh {
       glEnableVertexAttribArray(0); // positions
       glEnableVertexAttribArray(1); // colors
       glEnableVertexAttribArray(2); // UVs
+      glEnableVertexAttribArray(3); // normals
 
       glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(0));
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(3 * sizeof(float)));
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(6 * sizeof(float)));
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(8 * sizeof(float)));
       glBindBuffer(GL_ARRAY_BUFFER, 0);
 
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo); // indices
@@ -66,7 +72,7 @@ struct Mesh {
   }
 
   template <typename TFunc>
-  static Mesh shitfuck(size_t size, TFunc f) {
+  static Mesh createMeshByVertexGenerator(size_t size, TFunc f) {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
     for (size_t i = 0; i < size; i++) {
@@ -78,7 +84,7 @@ struct Mesh {
 
   static Mesh fromPosUV(std::vector<glm::vec3> positions, std::vector<glm::vec2> uvs) {
     assert(positions.size() == uvs.size());
-    return shitfuck(positions.size(), [&](size_t i) {
+    return createMeshByVertexGenerator(positions.size(), [&](size_t i) {
       Vertex v = {};
       v.pos = positions[i], v.tex_coord = uvs[i];
       return v;
@@ -92,83 +98,6 @@ struct Mesh {
   }
 };
 
-std::vector<glm::vec3> genCubeVerts() {
-  std::vector<glm::vec3> pts;
-
-  auto addSide = [&](glm::quat rot) {
-    pts.push_back(rot * glm::vec3{-1, -1, 1});
-    pts.push_back(rot * glm::vec3{ 1, -1, 1});
-    pts.push_back(rot * glm::vec3{-1,  1, 1});
-
-    pts.push_back(rot * glm::vec3{ 1,  1, 1});
-    pts.push_back(rot * glm::vec3{-1,  1, 1});
-    pts.push_back(rot * glm::vec3{ 1, -1, 1});
-  };
-
-  for (float rots : {0., 0.25, 0.5, 0.75})
-    addSide(glm::angleAxis(glm::two_pi<float>() * rots, glm::vec3(0, 1, 0)));
-  for (float rots : {-0.25, 0.25})
-    addSide(glm::angleAxis(glm::two_pi<float>() * rots, glm::vec3(1, 0, 0)));
-  
-  return pts;
-}
-
-std::vector<glm::vec3> genCubeColors() {
-  std::vector<glm::vec3> colors;
-
-  auto addSide = [&](glm::vec3 color) {
-    for (int i = 0; i < 6; i++) {
-      colors.emplace_back(color);
-    }
-  };
-
-  glm::vec3 c1{1, 0, 0}, c2{0, 1, 0}, c3{0, 0, 1};
-  addSide(c1);
-  addSide(c2);
-  addSide(c1);
-  addSide(c2);
-  addSide(c3);
-  addSide(c3);
-  return colors;
-}
-
-std::vector<glm::vec2> genCubeUVs() {
-  std::vector<glm::vec2> tex;
-
-  auto addSide = [&]() {
-    tex.push_back(glm::vec2{0, 0});
-    tex.push_back(glm::vec2{1, 0});
-    tex.push_back(glm::vec2{0, 1});
-
-    tex.push_back(glm::vec2{1, 1});
-    tex.push_back(glm::vec2{0, 1});
-    tex.push_back(glm::vec2{1, 0});
-  };
-
-  for (int i = 0; i < 6; i++)
-    addSide();
-  
-  return tex;
-}
-
-
-Mesh genCube() {
-    return Mesh::fromPosUV(genCubeVerts(), genCubeUVs());
-}
-
-// Mesh genXZPlane() {
-//     return Mesh::fromPosColor(
-//         {
-//             {-1, 0, -1},
-//             { 1, 0, -1},
-//             {-1, 0,  1},
-//             { 1, 0,  1},
-//             {-1, 0,  1},
-//             { 1, 0, -1},
-//         },
-//         std::vector<glm::vec3>(6, glm::vec3{0.0, 0.0, 0.0})
-//     );
-// }
 
 Mesh loadSimpleObj(std::string path) {
   std::ifstream fin(path);
@@ -179,6 +108,7 @@ Mesh loadSimpleObj(std::string path) {
 
   std::vector<glm::vec3> positions;
   std::vector<glm::vec2> uvs;
+  std::vector<glm::vec3> normals;
 
   while (fin) {
     std::string kind;
@@ -196,26 +126,34 @@ Mesh loadSimpleObj(std::string path) {
       for (int i = 0; i < 3; i++) {
         std::string vert_indices;
         fin >> vert_indices;
-        
+
+        int pos_idx, uv_idx, norm_idx;
+        int scanned = sscanf(vert_indices.c_str(), "%d/%d/%d", &pos_idx, &uv_idx, &norm_idx);
+        assert(scanned == 3);
+
         Mesh::Vertex v = {};
-        assert(std::count(vert_indices.begin(), vert_indices.end(), '/') == 2); // haha
-        size_t s1 = vert_indices.find('/'), s2 = vert_indices.rfind('/');
-        int pos_idx = std::atoi(vert_indices.substr(0, s1).c_str());
-        int uv_idx = std::atoi(vert_indices.substr(s1 + 1, s2 - s1 - 1).c_str());
-        --pos_idx, --uv_idx;
-        assert(pos_idx < positions.size());
-        assert(uv_idx < uvs.size());
-        v.pos = positions[pos_idx];
-        v.tex_coord = uvs[uv_idx];
+
+        assert(pos_idx - 1 < positions.size());
+        v.pos = positions[pos_idx - 1];
+
+        assert(uv_idx - 1 < uvs.size());
+        v.tex_coord = uvs[uv_idx - 1];
+
+        assert(norm_idx - 1 < normals.size());
+        v.normal = normals[norm_idx - 1];
 
         vertices.push_back(v);
         indices.push_back(indices.size());
       }
+    } else if (kind == "vn") {
+      glm::vec3 norm;
+      fin >> norm.x >> norm.y >> norm.z;
+      normals.push_back(norm);
     } else {
-      assert(kind == "o" || kind == "mtllib" || kind == "#" || kind == "vn" || kind == "usemtl" || kind == "s");
-      std::string line;
-      std::getline(fin, line);
-      //pass
+        assert(kind == "o" || kind == "mtllib" || kind == "#" || kind == "usemtl" || kind == "s");
+        std::string line;
+        std::getline(fin, line);
+        // pass
     }
     assert(fin);
   }
