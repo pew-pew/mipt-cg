@@ -188,7 +188,7 @@ Module['FS_createPath']("/", "data", true, true);
     }
   
    }
-   loadPackage({"files": [{"filename": "/shaders/vertex.glsl", "start": 0, "end": 712, "audio": 0}, {"filename": "/shaders/fragment_es.glsl", "start": 712, "end": 1463, "audio": 0}, {"filename": "/shaders/vertex_es.glsl", "start": 1463, "end": 2249, "audio": 0}, {"filename": "/shaders/fragment.glsl", "start": 2249, "end": 2879, "audio": 0}, {"filename": "/data/roma_smol.obj", "start": 2879, "end": 251556, "audio": 0}, {"filename": "/data/projectile.jpg", "start": 251556, "end": 295044, "audio": 0}, {"filename": "/data/roma_smol.jpg", "start": 295044, "end": 419856, "audio": 0}, {"filename": "/data/projectile.obj", "start": 419856, "end": 423187, "audio": 0}], "remote_package_size": 423187, "package_uuid": "6b3b1ccd-3496-4d66-8908-ed362160fd32"});
+   loadPackage({"files": [{"filename": "/shaders/vertex.glsl", "start": 0, "end": 712, "audio": 0}, {"filename": "/shaders/fragment_es.glsl", "start": 712, "end": 1503, "audio": 0}, {"filename": "/shaders/vertex_es.glsl", "start": 1503, "end": 2289, "audio": 0}, {"filename": "/shaders/fragment.glsl", "start": 2289, "end": 2919, "audio": 0}, {"filename": "/data/roma_smol.obj", "start": 2919, "end": 251596, "audio": 0}, {"filename": "/data/projectile.jpg", "start": 251596, "end": 295084, "audio": 0}, {"filename": "/data/roma_smol.jpg", "start": 295084, "end": 419896, "audio": 0}, {"filename": "/data/projectile.obj", "start": 419896, "end": 423227, "audio": 0}], "remote_package_size": 423227, "package_uuid": "08c0c729-226d-44c9-b746-9d7680f3b0b5"});
   
   })();
   
