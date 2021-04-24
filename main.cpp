@@ -67,6 +67,7 @@ void initGlewGLFW() {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
   #endif
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
 #else
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
@@ -322,7 +323,22 @@ int main()
     glViewport(0, 0, w, h);
   });
 
+  // glDebugMessageCallback([](GLenum source,
+  //           GLenum type,
+  //           GLuint id,
+  //           GLenum severity,
+  //           GLsizei length,
+  //           const GLchar *message,
+  //           const void *userParam)
+  // {
+  //   std::cerr << "ERR " << type << ": " << message << std::endl;
+  // }, nullptr);
+
+  #ifndef __EMSCRIPTEN__
   uint shader_program = createShaderProgram("./shaders/vertex.glsl", "./shaders/fragment.glsl");
+  #else
+  uint shader_program = createShaderProgram("./shaders/vertex_es.glsl", "./shaders/fragment_es.glsl");
+  #endif
   int m_matrix_id = glGetUniformLocation(shader_program, "M");
   int v_matrix_id = glGetUniformLocation(shader_program, "V");
   int p_matrix_id = glGetUniformLocation(shader_program, "P");
@@ -363,14 +379,14 @@ int main()
     glm::mat4 projection = glm::perspective<float>(glm::radians(60.),
                                                    (float)width / height,
                                                    0.01, 100);
-    glUniformMatrix4fv(v_matrix_id, 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(p_matrix_id, 1, GL_FALSE, glm::value_ptr(projection));
     glm::vec3 light_pos = player_camera_pos;
     if (!scene.projectiles.empty())
       light_pos = scene.projectiles.back().pos;
-    glUniform3fv(light_pos_id, 1, glm::value_ptr(light_pos));
 
     glUseProgram(shader_program);
+    glUniformMatrix4fv(v_matrix_id, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(p_matrix_id, 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform3fv(light_pos_id, 1, glm::value_ptr(light_pos));
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, roma_texture_handle);
@@ -420,9 +436,11 @@ int main()
     double free_time = std::max(timePerFrame - elapsed_time, 0.0);
 
     // Sleep until next frame to keep FPS rate at the certain level
+    #ifndef __EMSCRIPTEN__
     if (free_time > 0) {
       std::this_thread::sleep_for(std::chrono::duration<double>(free_time));
     }
+    #endif
   };
 
   current_time = glfwGetTime();

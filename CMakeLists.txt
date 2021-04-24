@@ -29,6 +29,7 @@ if (NOT EMSCRIPTEN)
     endif()
 else()
     add_executable(main main.cpp shaders/vertex.glsl shaders/fragment.glsl)
+    target_include_directories(main PRIVATE external/stb)
     target_link_libraries(main glm)
 
     # target_compile_options(
@@ -40,6 +41,7 @@ else()
     target_link_options(main PRIVATE
         "SHELL:
         -s USE_GLFW=3
+        -s ALLOW_MEMORY_GROWTH=1
         --preload-file ${CMAKE_SOURCE_DIR}/shaders@./shaders
         --preload-file ${CMAKE_SOURCE_DIR}/data@./data
         --shell-file /usr/lib/emscripten/src/shell_minimal.html
