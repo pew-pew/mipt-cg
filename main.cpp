@@ -350,7 +350,13 @@ int main()
   uint roma_texture_handle = loadTexture("./data/roma_smol.jpg");
 
   Mesh projectile = loadSimpleObj("./data/projectile.obj");
-  uint projectile_texture_handle = loadTexture("./data/projectile.jpg", true);
+  bool repeat;
+  #ifndef __EMSCRIPTEN__
+  repeat = true;
+  #else
+  repeat = false; // webgl can't handle GL_REPEAT with non-power-of-two texture dimensions
+  #endif
+  uint projectile_texture_handle = loadTexture("./data/projectile.jpg", repeat);
 
   // Fixed FPS
   int targetFPS = 60;

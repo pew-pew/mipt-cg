@@ -12,7 +12,7 @@ varying float unused_hack;
 
 void main()
 {
-    vec3 reflectance = texture2D(tex, tex_coord).xyz;
+    vec3 reflectance = texture2D(tex, tex_coord - floor(tex_coord)).xyz; // emulate GL_REPEAT
 
     float lightPower = min(1.0 / dot(to_light, to_light), 1.0);
 
