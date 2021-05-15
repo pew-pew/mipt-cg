@@ -1,4 +1,3 @@
-// Include standard headers
 #include <stdio.h>
 #include <stdlib.h>
 #include <fstream>
@@ -6,10 +5,8 @@
 #include <cassert>
 #include <random>
 
-// Include GLEW
 #include <GL/glew.h>
 
-// Include GLFW
 #include <GLFW/glfw3.h>
 
 #include <chrono>
@@ -41,6 +38,7 @@ using namespace glm;
 #include "world.hpp"
 #include "input.hpp"
 #include "graphics.hpp"
+#include "ui.hpp"
 
 void dumpGLErrors(std::string location="") {
   GLenum err;
@@ -95,9 +93,6 @@ GLFWwindow* initGlewGLFW() {
   glfwMakeContextCurrent(window);
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-  // if (glfwRawMouseMotionSupported()) {
-  //   glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-  // }
 
   if (glewInit() != GLEW_OK) {
     fprintf(stderr, "Failed to initialize GLEW\n");
@@ -116,17 +111,6 @@ int main()
   InputContext input{window};
   MouseInput::initGlobal(window, input.mouse_input);
 
-  // glDebugMessageCallback([](GLenum source,
-  //           GLenum type,
-  //           GLuint id,
-  //           GLenum severity,
-  //           GLsizei length,
-  //           const GLchar *message,
-  //           const void *userParam)
-  // {
-  //   std::cerr << "ERR " << type << ": " << message << std::endl;
-  // }, nullptr);
-
   Scene scene(&input, 42);
 
   static auto mouse_click_callback = [&](int button, int action) {
@@ -134,7 +118,7 @@ int main()
       scene.spawnProjectile();
   };
 
-  glfwSetMouseButtonCallback(input.window, [](GLFWwindow* window, int button, int action, int mods) {
+  glfwSetMouseButtonCallback(window, [](GLFWwindow* window, int button, int action, int mods) {
     mouse_click_callback(button, action);
   });
 
@@ -142,21 +126,44 @@ int main()
   double timePerFrame = 1.0 / targetFPS;
   double current_time = glfwGetTime();;
   double last_time = current_time;
-  double elapsed_time = 0;
+  double game_time = 0;
+  double frame_time = 0;
 
   Graphics graphics;
   Graphics::initGlobal(graphics, window);
   graphics.prepare();
 
+  UI ui(window);
+
+  static double timeSpeed = 1;
+  glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (action != GLFW_PRESS)
+      return;
+
+    double step = 1.25;
+    if (key == GLFW_KEY_UP)
+      timeSpeed *= step;
+    else if (key == GLFW_KEY_DOWN)
+      timeSpeed /= step;
+  });
+
   static std::function<void()> loop = [&]() {
     last_time = current_time;
 
-    scene.update(elapsed_time);
-    graphics.drawScene(current_time, scene);
+    game_time += frame_time * timeSpeed;
+    scene.update(frame_time * timeSpeed);
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    graphics.drawScene(game_time, scene);
+    ui.draw(frame_time, timeSpeed, scene);
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
 
     current_time = glfwGetTime();
-    elapsed_time = current_time - last_time;
-    double free_time = std::max(timePerFrame - elapsed_time, 0.0);
+    frame_time = current_time - last_time;
+    double free_time = std::max(timePerFrame - frame_time, 0.0);
 
     // Sleep until next frame to keep FPS rate at the certain level
     #ifndef __EMSCRIPTEN__
@@ -176,6 +183,11 @@ int main()
 
   // todo: cleanup opengl things
 
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+
+  glfwDestroyWindow(window);
   glfwTerminate();
   return 0;
 }

@@ -64,6 +64,7 @@ class Scene {
   };
   std::vector<QuatTransform> enemies;
   std::vector<QuatTransform> projectiles;
+  int killed_count = 0;
 
   static constexpr glm::vec3 PERSON_HEAD{0, 1.5, 0};
 
@@ -142,6 +143,7 @@ class Scene {
         if (checkCollision(projectiles[ip].pos, enemies[ie].pos)) {
           enemies.erase(enemies.begin() + ie);
           projectiles.erase(projectiles.begin() + ip);
+          killed_count++;
           ip--;
           break;
         }

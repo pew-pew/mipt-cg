@@ -55,8 +55,6 @@ struct Graphics {
   }
 
   void drawScene(double current_time, Scene &scene) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     // I don't care about performance
     int m_matrix_id = glGetUniformLocation(shader_program, "M");
     int v_matrix_id = glGetUniformLocation(shader_program, "V");
@@ -108,8 +106,5 @@ struct Graphics {
       glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
       projectile_mesh.draw();
     }
-
-    glfwSwapBuffers(window);
-    glfwPollEvents();
   }
 };

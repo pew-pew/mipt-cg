@@ -16,10 +16,11 @@ if (NOT EMSCRIPTEN)
 endif()
 
 add_subdirectory(external/glm)
+add_subdirectory(external/imgui)
 
 if (NOT EMSCRIPTEN)
     add_executable(main main.cpp)
-    target_link_libraries(main glm)
+    target_link_libraries(main glm imgui_glfw_gl3)
     target_include_directories(main PRIVATE external/stb)
 
     if (APPLE)
@@ -30,7 +31,7 @@ if (NOT EMSCRIPTEN)
 else()
     add_executable(main main.cpp shaders/vertex.glsl shaders/fragment.glsl)
     target_include_directories(main PRIVATE external/stb)
-    target_link_libraries(main glm)
+    target_link_libraries(main glm imgui_glfw_gl3)
 
     # target_compile_options(
     #     main
