@@ -188,7 +188,7 @@ Module['FS_createPath']("/", "data", true, true);
     }
   
    }
-   loadPackage({"files": [{"filename": "/shaders/vertex.glsl", "start": 0, "end": 712, "audio": 0}, {"filename": "/shaders/fragment_es.glsl", "start": 712, "end": 1503, "audio": 0}, {"filename": "/shaders/vertex_es.glsl", "start": 1503, "end": 2289, "audio": 0}, {"filename": "/shaders/fragment.glsl", "start": 2289, "end": 2919, "audio": 0}, {"filename": "/data/roma_smol.obj", "start": 2919, "end": 251596, "audio": 0}, {"filename": "/data/projectile.jpg", "start": 251596, "end": 295084, "audio": 0}, {"filename": "/data/roma_smol.jpg", "start": 295084, "end": 419896, "audio": 0}, {"filename": "/data/projectile.obj", "start": 419896, "end": 423227, "audio": 0}], "remote_package_size": 423227, "package_uuid": "08c0c729-226d-44c9-b746-9d7680f3b0b5"});
+   loadPackage({"files": [{"filename": "/shaders/vertex.glsl", "start": 0, "end": 703, "audio": 0}, {"filename": "/shaders/fragment_es.glsl", "start": 703, "end": 1577, "audio": 0}, {"filename": "/shaders/vertex_es.glsl", "start": 1577, "end": 2343, "audio": 0}, {"filename": "/shaders/fragment.glsl", "start": 2343, "end": 3103, "audio": 0}, {"filename": "/data/roma_smol.obj", "start": 3103, "end": 251780, "audio": 0}, {"filename": "/data/projectile.jpg", "start": 251780, "end": 295268, "audio": 0}, {"filename": "/data/roma_smol.jpg", "start": 295268, "end": 420080, "audio": 0}, {"filename": "/data/projectile.obj", "start": 420080, "end": 423411, "audio": 0}], "remote_package_size": 423411, "package_uuid": "d506d5da-bb4d-4d36-9cfa-c596d976adb2"});
   
   })();
   
@@ -5677,6 +5677,12 @@ var ASM_CONSTS = {
       GLctx['bindVertexArray'](GL.vaos[vao]);
     }
 
+  function _glBlendEquation(x0) { GLctx['blendEquation'](x0) }
+
+  function _glBlendEquationSeparate(x0, x1) { GLctx['blendEquationSeparate'](x0, x1) }
+
+  function _glBlendFuncSeparate(x0, x1, x2, x3) { GLctx['blendFuncSeparate'](x0, x1, x2, x3) }
+
   function _glBufferData(target, size, data, usage) {
   
         // N.b. here first form specifies a heap subarray, second form an integer size, so the ?: code here is polymorphic. It is advised to avoid
@@ -5722,6 +5728,19 @@ var ASM_CONSTS = {
       }
     }
 
+  function _glDeleteProgram(id) {
+      if (!id) return;
+      var program = GL.programs[id];
+      if (!program) { // glDeleteProgram actually signals an error when deleting a nonexisting object, unlike some other GL delete functions.
+        GL.recordError(0x501 /* GL_INVALID_VALUE */);
+        return;
+      }
+      GLctx.deleteProgram(program);
+      program.name = 0;
+      GL.programs[id] = null;
+      GL.programInfos[id] = null;
+    }
+
   function _glDeleteShader(id) {
       if (!id) return;
       var shader = GL.shaders[id];
@@ -5733,6 +5752,17 @@ var ASM_CONSTS = {
       GL.shaders[id] = null;
     }
 
+  function _glDeleteTextures(n, textures) {
+      for (var i = 0; i < n; i++) {
+        var id = HEAP32[(((textures)+(i*4))>>2)];
+        var texture = GL.textures[id];
+        if (!texture) continue; // GL spec: "glDeleteTextures silently ignores 0s and names that do not correspond to existing textures".
+        GLctx.deleteTexture(texture);
+        texture.name = 0;
+        GL.textures[id] = null;
+      }
+    }
+
   function _glDeleteVertexArrays(n, vaos) {
       for (var i = 0; i < n; i++) {
         var id = HEAP32[(((vaos)+(i*4))>>2)];
@@ -5740,6 +5770,13 @@ var ASM_CONSTS = {
         GL.vaos[id] = null;
       }
     }
+
+  function _glDetachShader(program, shader) {
+      GLctx.detachShader(GL.programs[program],
+                              GL.shaders[shader]);
+    }
+
+  function _glDisable(x0) { GLctx['disable'](x0) }
 
   function _glDrawElements(mode, count, type, indices) {
   
@@ -5783,6 +5820,126 @@ var ASM_CONSTS = {
     }
 
   function _glGenerateMipmap(x0) { GLctx['generateMipmap'](x0) }
+
+  function _glGetAttribLocation(program, name) {
+      return GLctx.getAttribLocation(GL.programs[program], UTF8ToString(name));
+    }
+
+  function readI53FromI64(ptr) {
+      return HEAPU32[ptr>>2] + HEAP32[ptr+4>>2] * 4294967296;
+    }
+  
+  function readI53FromU64(ptr) {
+      return HEAPU32[ptr>>2] + HEAPU32[ptr+4>>2] * 4294967296;
+    }
+  function writeI53ToI64(ptr, num) {
+      HEAPU32[ptr>>2] = num;
+      HEAPU32[ptr+4>>2] = (num - HEAPU32[ptr>>2])/4294967296;
+      var deserialized = (num >= 0) ? readI53FromU64(ptr) : readI53FromI64(ptr);
+      if (deserialized != num) warnOnce('writeI53ToI64() out of range: serialized JS Number ' + num + ' to Wasm heap as bytes lo=0x' + HEAPU32[ptr>>2].toString(16) + ', hi=0x' + HEAPU32[ptr+4>>2].toString(16) + ', which deserializes back to ' + deserialized + ' instead!');
+    }
+  function emscriptenWebGLGet(name_, p, type) {
+      // Guard against user passing a null pointer.
+      // Note that GLES2 spec does not say anything about how passing a null pointer should be treated.
+      // Testing on desktop core GL 3, the application crashes on glGetIntegerv to a null pointer, but
+      // better to report an error instead of doing anything random.
+      if (!p) {
+        GL.recordError(0x501 /* GL_INVALID_VALUE */);
+        return;
+      }
+      var ret = undefined;
+      switch(name_) { // Handle a few trivial GLES values
+        case 0x8DFA: // GL_SHADER_COMPILER
+          ret = 1;
+          break;
+        case 0x8DF8: // GL_SHADER_BINARY_FORMATS
+          if (type != 0 && type != 1) {
+            GL.recordError(0x500); // GL_INVALID_ENUM
+          }
+          return; // Do not write anything to the out pointer, since no binary formats are supported.
+        case 0x8DF9: // GL_NUM_SHADER_BINARY_FORMATS
+          ret = 0;
+          break;
+        case 0x86A2: // GL_NUM_COMPRESSED_TEXTURE_FORMATS
+          // WebGL doesn't have GL_NUM_COMPRESSED_TEXTURE_FORMATS (it's obsolete since GL_COMPRESSED_TEXTURE_FORMATS returns a JS array that can be queried for length),
+          // so implement it ourselves to allow C++ GLES2 code get the length.
+          var formats = GLctx.getParameter(0x86A3 /*GL_COMPRESSED_TEXTURE_FORMATS*/);
+          ret = formats ? formats.length : 0;
+          break;
+      }
+  
+      if (ret === undefined) {
+        var result = GLctx.getParameter(name_);
+        switch (typeof(result)) {
+          case "number":
+            ret = result;
+            break;
+          case "boolean":
+            ret = result ? 1 : 0;
+            break;
+          case "string":
+            GL.recordError(0x500); // GL_INVALID_ENUM
+            return;
+          case "object":
+            if (result === null) {
+              // null is a valid result for some (e.g., which buffer is bound - perhaps nothing is bound), but otherwise
+              // can mean an invalid name_, which we need to report as an error
+              switch(name_) {
+                case 0x8894: // ARRAY_BUFFER_BINDING
+                case 0x8B8D: // CURRENT_PROGRAM
+                case 0x8895: // ELEMENT_ARRAY_BUFFER_BINDING
+                case 0x8CA6: // FRAMEBUFFER_BINDING or DRAW_FRAMEBUFFER_BINDING
+                case 0x8CA7: // RENDERBUFFER_BINDING
+                case 0x8069: // TEXTURE_BINDING_2D
+                case 0x85B5: // WebGL 2 GL_VERTEX_ARRAY_BINDING, or WebGL 1 extension OES_vertex_array_object GL_VERTEX_ARRAY_BINDING_OES
+                case 0x8514: { // TEXTURE_BINDING_CUBE_MAP
+                  ret = 0;
+                  break;
+                }
+                default: {
+                  GL.recordError(0x500); // GL_INVALID_ENUM
+                  return;
+                }
+              }
+            } else if (result instanceof Float32Array ||
+                       result instanceof Uint32Array ||
+                       result instanceof Int32Array ||
+                       result instanceof Array) {
+              for (var i = 0; i < result.length; ++i) {
+                switch (type) {
+                  case 0: HEAP32[(((p)+(i*4))>>2)] = result[i]; break;
+                  case 2: HEAPF32[(((p)+(i*4))>>2)] = result[i]; break;
+                  case 4: HEAP8[(((p)+(i))>>0)] = result[i] ? 1 : 0; break;
+                }
+              }
+              return;
+            } else {
+              try {
+                ret = result.name | 0;
+              } catch(e) {
+                GL.recordError(0x500); // GL_INVALID_ENUM
+                err('GL_INVALID_ENUM in glGet' + type + 'v: Unknown object returned from WebGL getParameter(' + name_ + ')! (error: ' + e + ')');
+                return;
+              }
+            }
+            break;
+          default:
+            GL.recordError(0x500); // GL_INVALID_ENUM
+            err('GL_INVALID_ENUM in glGet' + type + 'v: Native code calling glGet' + type + 'v(' + name_ + ') and it returns ' + result + ' of type ' + typeof(result) + '!');
+            return;
+        }
+      }
+  
+      switch (type) {
+        case 1: writeI53ToI64(p, ret); break;
+        case 0: HEAP32[((p)>>2)] = ret; break;
+        case 2:   HEAPF32[((p)>>2)] = ret; break;
+        case 4: HEAP8[((p)>>0)] = ret ? 1 : 0; break;
+      }
+    }
+  function _glGetIntegerv(name_, p) {
+      emscriptenWebGLGet(name_, p, 0);
+    }
 
   function _glGetProgramInfoLog(program, maxLength, length, infoLog) {
       var log = GLctx.getProgramInfoLog(GL.programs[program]);
@@ -5900,10 +6057,14 @@ var ASM_CONSTS = {
       }
     }
 
+  function _glIsEnabled(x0) { return GLctx['isEnabled'](x0) }
+
   function _glLinkProgram(program) {
       GLctx.linkProgram(GL.programs[program]);
       GL.populateUniformTable(program);
     }
+
+  function _glScissor(x0, x1, x2, x3) { GLctx['scissor'](x0, x1, x2, x3) }
 
   function _glShaderSource(shader, count, string, length) {
       var source = GL.getSource(shader, count, string, length);
@@ -6908,12 +7069,92 @@ var ASM_CONSTS = {
         };
         return table[param];
       }};
+  function _glfwCreateStandardCursor(shape) {}
+
   function _glfwCreateWindow(width, height, title, monitor, share) {
       return GLFW.createWindow(width, height, title, monitor, share);
     }
 
+  function _glfwDestroyCursor(cursor) {}
+
+  function _glfwDestroyWindow(winid) {
+      return GLFW.destroyWindow(winid);
+    }
+
+  function _glfwGetClipboardString(win) {}
+
+  function _glfwGetCursorPos(winid, x, y) {
+      GLFW.getCursorPos(winid, x, y);
+    }
+
+  function _glfwGetFramebufferSize(winid, width, height) {
+      var ww = 0;
+      var wh = 0;
+  
+      var win = GLFW.WindowFromId(winid);
+      if (win) {
+        ww = win.width;
+        wh = win.height;
+      }
+  
+      if (width) {
+        setValue(width, ww, 'i32');
+      }
+  
+      if (height) {
+        setValue(height, wh, 'i32');
+      }
+    }
+
+  function _glfwGetInputMode(winid, mode) {
+      var win = GLFW.WindowFromId(winid);
+      if (!win) return;
+  
+      switch (mode) {
+        case 0x00033001: { // GLFW_CURSOR
+          if (Browser.pointerLock) {
+            win.inputModes[mode] = 0x00034003; // GLFW_CURSOR_DISABLED
+          } else {
+            win.inputModes[mode] = 0x00034001; // GLFW_CURSOR_NORMAL
+          }
+        }
+      }
+  
+      return win.inputModes[mode];
+    }
+
+  function _glfwGetJoystickAxes(joy, count) {
+      GLFW.refreshJoysticks();
+  
+      var state = GLFW.joys[joy];
+      if (!state || !state.axes) {
+        setValue(count, 0, 'i32');
+        return;
+      }
+  
+      setValue(count, state.axesCount, 'i32');
+      return state.axes;
+    }
+
+  function _glfwGetJoystickButtons(joy, count) {
+      GLFW.refreshJoysticks();
+  
+      var state = GLFW.joys[joy];
+      if (!state || !state.buttons) {
+        setValue(count, 0, 'i32');
+        return;
+      }
+  
+      setValue(count, state.buttonsCount, 'i32');
+      return state.buttons;
+    }
+
   function _glfwGetKey(winid, key) {
       return GLFW.getKey(winid, key);
+    }
+
+  function _glfwGetMouseButton(winid, button) {
+      return GLFW.getMouseButton(winid, button);
     }
 
   function _glfwGetTime() {
@@ -6962,6 +7203,14 @@ var ASM_CONSTS = {
 
   function _glfwPollEvents() {}
 
+  function _glfwSetCharCallback(winid, cbfun) {
+      return GLFW.setCharCallback(winid, cbfun);
+    }
+
+  function _glfwSetClipboardString(win, string) {}
+
+  function _glfwSetCursor(winid, cursor) {}
+
   function _glfwSetCursorEnterCallback(winid, cbfun) {
       var win = GLFW.WindowFromId(winid);
       if (!win) return null;
@@ -6970,8 +7219,18 @@ var ASM_CONSTS = {
       return prevcbfun;
     }
 
+  function _glfwSetCursorPos(winid, x, y) {
+      GLFW.setCursorPos(winid, x, y);
+    }
+
   function _glfwSetCursorPosCallback(winid, cbfun) {
       return GLFW.setCursorPosCallback(winid, cbfun);
+    }
+
+  function _glfwSetErrorCallback(cbfun) {
+      var prevcbfun = GLFW.errorFunc;
+      GLFW.errorFunc = cbfun;
+      return prevcbfun;
     }
 
   function _glfwSetFramebufferSizeCallback(winid, cbfun) {
@@ -6986,8 +7245,16 @@ var ASM_CONSTS = {
       GLFW.setInputMode(winid, mode, value);
     }
 
+  function _glfwSetKeyCallback(winid, cbfun) {
+      return GLFW.setKeyCallback(winid, cbfun);
+    }
+
   function _glfwSetMouseButtonCallback(winid, cbfun) {
       return GLFW.setMouseButtonCallback(winid, cbfun);
+    }
+
+  function _glfwSetScrollCallback(winid, cbfun) {
+      return GLFW.setScrollCallback(winid, cbfun);
     }
 
   function _glfwSwapBuffers(winid) {
@@ -7503,6 +7770,9 @@ var asmLibraryArg = {
   "glBindBuffer": _glBindBuffer,
   "glBindTexture": _glBindTexture,
   "glBindVertexArray": _glBindVertexArray,
+  "glBlendEquation": _glBlendEquation,
+  "glBlendEquationSeparate": _glBlendEquationSeparate,
+  "glBlendFuncSeparate": _glBlendFuncSeparate,
   "glBufferData": _glBufferData,
   "glClear": _glClear,
   "glClearColor": _glClearColor,
@@ -7510,8 +7780,12 @@ var asmLibraryArg = {
   "glCreateProgram": _glCreateProgram,
   "glCreateShader": _glCreateShader,
   "glDeleteBuffers": _glDeleteBuffers,
+  "glDeleteProgram": _glDeleteProgram,
   "glDeleteShader": _glDeleteShader,
+  "glDeleteTextures": _glDeleteTextures,
   "glDeleteVertexArrays": _glDeleteVertexArrays,
+  "glDetachShader": _glDetachShader,
+  "glDisable": _glDisable,
   "glDrawElements": _glDrawElements,
   "glEnable": _glEnable,
   "glEnableVertexAttribArray": _glEnableVertexAttribArray,
@@ -7519,12 +7793,16 @@ var asmLibraryArg = {
   "glGenTextures": _glGenTextures,
   "glGenVertexArrays": _glGenVertexArrays,
   "glGenerateMipmap": _glGenerateMipmap,
+  "glGetAttribLocation": _glGetAttribLocation,
+  "glGetIntegerv": _glGetIntegerv,
   "glGetProgramInfoLog": _glGetProgramInfoLog,
   "glGetProgramiv": _glGetProgramiv,
   "glGetShaderInfoLog": _glGetShaderInfoLog,
   "glGetShaderiv": _glGetShaderiv,
   "glGetUniformLocation": _glGetUniformLocation,
+  "glIsEnabled": _glIsEnabled,
   "glLinkProgram": _glLinkProgram,
+  "glScissor": _glScissor,
   "glShaderSource": _glShaderSource,
   "glTexImage2D": _glTexImage2D,
   "glTexParameteri": _glTexParameteri,
@@ -7536,18 +7814,35 @@ var asmLibraryArg = {
   "glVertexAttribPointer": _glVertexAttribPointer,
   "glViewport": _glViewport,
   "glewInit": _glewInit,
+  "glfwCreateStandardCursor": _glfwCreateStandardCursor,
   "glfwCreateWindow": _glfwCreateWindow,
+  "glfwDestroyCursor": _glfwDestroyCursor,
+  "glfwDestroyWindow": _glfwDestroyWindow,
+  "glfwGetClipboardString": _glfwGetClipboardString,
+  "glfwGetCursorPos": _glfwGetCursorPos,
+  "glfwGetFramebufferSize": _glfwGetFramebufferSize,
+  "glfwGetInputMode": _glfwGetInputMode,
+  "glfwGetJoystickAxes": _glfwGetJoystickAxes,
+  "glfwGetJoystickButtons": _glfwGetJoystickButtons,
   "glfwGetKey": _glfwGetKey,
+  "glfwGetMouseButton": _glfwGetMouseButton,
   "glfwGetTime": _glfwGetTime,
   "glfwGetWindowSize": _glfwGetWindowSize,
   "glfwInit": _glfwInit,
   "glfwMakeContextCurrent": _glfwMakeContextCurrent,
   "glfwPollEvents": _glfwPollEvents,
+  "glfwSetCharCallback": _glfwSetCharCallback,
+  "glfwSetClipboardString": _glfwSetClipboardString,
+  "glfwSetCursor": _glfwSetCursor,
   "glfwSetCursorEnterCallback": _glfwSetCursorEnterCallback,
+  "glfwSetCursorPos": _glfwSetCursorPos,
   "glfwSetCursorPosCallback": _glfwSetCursorPosCallback,
+  "glfwSetErrorCallback": _glfwSetErrorCallback,
   "glfwSetFramebufferSizeCallback": _glfwSetFramebufferSizeCallback,
   "glfwSetInputMode": _glfwSetInputMode,
+  "glfwSetKeyCallback": _glfwSetKeyCallback,
   "glfwSetMouseButtonCallback": _glfwSetMouseButtonCallback,
+  "glfwSetScrollCallback": _glfwSetScrollCallback,
   "glfwSwapBuffers": _glfwSwapBuffers,
   "glfwTerminate": _glfwTerminate,
   "glfwWindowHint": _glfwWindowHint,
