@@ -1,7 +1,9 @@
 #version 330 core
 
-in vec2 tex_coord;
-in vec3 to_light, to_camera, normal;
+in GS_OUT {
+  vec2 tex_coord;
+  vec3 to_light, to_camera, normal;
+};
 
 uniform sampler2D tex;
 uniform float ambientK;
