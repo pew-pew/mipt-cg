@@ -40,20 +40,23 @@ void main() {
 
   float pseudorandom = gl_PrimitiveIDIn;
   vec3 rotAxis = normalize(vec3(sin(pseudorandom * 10), cos(pseudorandom * 20), sin(pseudorandom * 30)));
-  float rotSpeed = (cos(pseudorandom * 30) + 1) / 2;
+  float rotSpeed = (cos(pseudorandom * 30) + 1) * 10;
 
   float scale = 1 - explosionTime / explosionTotalTime;
 
+  vec3 shift = explosionSpeed * explosionTime * explosionDir;
+  float angle = rotSpeed * explosionTime;
+
   for (int i = 0; i < 3; i++) {
     gs_out.tex_coord = vs_out[i].tex_coord;
-    gs_out.to_light = vs_out[i].to_light;
-    gs_out.to_camera = vs_out[i].to_camera;
-    gs_out.normal = vs_out[i].normal;
+    gs_out.to_light = rotateAround(vs_out[i].to_light, rotAxis, angle);
+    gs_out.to_camera = rotateAround(vs_out[i].to_camera, rotAxis, angle);
+    gs_out.normal = rotateAround(vs_out[i].normal, rotAxis, angle);
 
     vec3 newPos = (
       partPos
-      + scale * rotateAround(pos[i] - partPos, rotAxis, rotSpeed * explosionTime)
-      + explosionSpeed * explosionTime * explosionDir
+      + scale * rotateAround(pos[i] - partPos, rotAxis, angle)
+      + shift
     );
     gl_Position = P * vec4(newPos, 1);
     EmitVertex();
