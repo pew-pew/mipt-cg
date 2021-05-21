@@ -14,6 +14,7 @@ struct UI {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
+    ImGui::GetIO().IniFilename = nullptr;
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 100"); // glsl version
   }
@@ -43,8 +44,8 @@ struct UI {
         ImGui::Text("Controls:\nMove - w/a/s/d\nLook - mouse\nShoot - LMB\nTime control - up/down arrows");
         ImGui::Separator();
         ImGui::Text("FPS: %.1f", (elapsed_time ? 1.0f / elapsed_time : 0));
-        ImGui::Text("Fuckers alive: %d", (int)scene.enemies.size());
-        ImGui::Text("Fuckers killed: %d", scene.killed_count);
+        ImGui::Text("Enemies alive: %d", (int)scene.enemies.size());
+        ImGui::Text("Enemies killed: %d", scene.killed_count);
         ImGui::Text("Time speed: %.2f", timeSpeed);
       }
       ImGui::End();
