@@ -26,7 +26,8 @@ struct Graphics {
   // Fixed FPS
   uint shader_program = createShaderProgram(
     (IS_EMSCRIPTEN ? "./shaders/vertex_es.glsl"   : "./shaders/vertex.glsl"),
-    (IS_EMSCRIPTEN ? "./shaders/fragment_es.glsl" : "./shaders/fragment.glsl")
+    (IS_EMSCRIPTEN ? "./shaders/fragment_es.glsl" : "./shaders/fragment.glsl"),
+    (IS_EMSCRIPTEN ? "doesnotexist"               : "./shaders/geometry.glsl")
   );
 
   Mesh roma_mesh = loadSimpleObj("./data/roma_smol.obj");
@@ -56,6 +57,11 @@ struct Graphics {
 
   void drawScene(double current_time, Scene &scene) {
     // I don't care about performance
+    int expl_time_id = glGetUniformLocation(shader_program, "explosionTime");
+    int expl_total_time_id = glGetUniformLocation(shader_program, "explosionTotalTime");
+    int expl_pos_id = glGetUniformLocation(shader_program, "explosionPos_world");
+    int expl_dir_id = glGetUniformLocation(shader_program, "explosionDir_world");
+    
     int m_matrix_id = glGetUniformLocation(shader_program, "M");
     int v_matrix_id = glGetUniformLocation(shader_program, "V");
     int p_matrix_id = glGetUniformLocation(shader_program, "P");
@@ -79,6 +85,14 @@ struct Graphics {
     glUniformMatrix4fv(p_matrix_id, 1, GL_FALSE, glm::value_ptr(projection));
     glUniform3fv(light_pos_id, 1, glm::value_ptr(light_pos));
 
+    {
+      glm::vec3 dummy{1, 0, 0};
+      glUniform3fv(expl_pos_id, 1, glm::value_ptr(dummy));
+      glUniform3fv(expl_dir_id, 1, glm::value_ptr(dummy));
+      glUniform1f(expl_time_id, 0.0f);
+      glUniform1f(expl_total_time_id, 1.0f);
+    }
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, roma_texture);
     glUniform1i(texture_id, 0);
@@ -86,6 +100,7 @@ struct Graphics {
     glUniform1f(ambient_id, 0.1f);
     for (auto& enemy_trans : scene.enemies) {
       glm::mat4 model = enemy_trans.getMat();
+
       glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
       roma_mesh.draw();
     }
@@ -105,6 +120,41 @@ struct Graphics {
 
       glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
       projectile_mesh.draw();
+    }
+
+    for (auto& obj : scene.dying_objects) {
+      if (current_time - obj.death_start > obj.death_duration)
+        continue;
+
+      glm::mat4 model;
+      if (obj.kind == DyingObject::Kind::projectile) {
+        model = (
+            obj.transform.getMat()
+            * glm::rotate(
+                // (float)obj.death_start * 10,
+                (float)current_time * 10,
+                glm::vec3{0.1, 0, 1}
+                )
+            * glm::scale(glm::vec3{1., 1., 1.} / 5.0f)
+        );
+      } else {
+        model = obj.transform.getMat();
+      }
+      glUniform3fv(expl_dir_id, 1, glm::value_ptr(obj.explosion_dir));
+      glUniform3fv(expl_pos_id, 1, glm::value_ptr(obj.explosion_pos));
+      glUniform1f(expl_time_id, (float)(current_time - obj.death_start));
+      glUniform1f(expl_total_time_id, (float)obj.death_duration);
+
+      glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
+      if (obj.kind == DyingObject::Kind::projectile) {
+        glUniform1f(ambient_id, 1.0f);
+        glBindTexture(GL_TEXTURE_2D, projectile_texture);
+        projectile_mesh.draw();
+      } else {
+        glUniform1f(ambient_id, 0.1f);
+        glBindTexture(GL_TEXTURE_2D, roma_texture);
+        roma_mesh.draw();
+      }
     }
   }
 };

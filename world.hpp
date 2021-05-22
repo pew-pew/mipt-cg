@@ -49,6 +49,16 @@ struct AngleTransform {
   }
 };
 
+struct DyingObject {
+  enum class Kind { enemy, projectile };
+  QuatTransform transform;
+  glm::vec3 explosion_pos;
+  glm::vec3 explosion_dir;
+  Kind kind;
+  double death_start;
+  constexpr static double death_duration = 1;
+};
+
 class Scene {
  public:
   Scene(InputContext *input_ctx, int64_t random_seed)
@@ -64,11 +74,13 @@ class Scene {
   };
   std::vector<QuatTransform> enemies;
   std::vector<QuatTransform> projectiles;
+  std::vector<DyingObject> dying_objects;
   int killed_count = 0;
 
   static constexpr glm::vec3 PERSON_HEAD{0, 1.5, 0};
 
   void update(double elapsed_time) {
+    time_ += elapsed_time;
     movePlayer(elapsed_time);
     spawnEnemies(elapsed_time);
     moveProjectiles(elapsed_time);
@@ -141,8 +153,14 @@ class Scene {
     for (size_t ip = 0; ip < projectiles.size(); ip++) {
       for (size_t ie = 0; ie < enemies.size(); ie++) {
         if (checkCollision(projectiles[ip].pos, enemies[ie].pos)) {
+          glm::vec3 expl = projectiles[ip].pos;
+          glm::vec3 expl_dir = (projectiles[ip].dir * FORWARD) * PROJECTILE_MOVE_SPEED;
+          dying_objects.push_back(DyingObject{enemies[ie], expl, expl_dir, DyingObject::Kind::enemy, time_});
+          dying_objects.push_back(DyingObject{projectiles[ip], expl, expl_dir, DyingObject::Kind::projectile, time_});
+
           enemies.erase(enemies.begin() + ie);
           projectiles.erase(projectiles.begin() + ip);
+
           killed_count++;
           ip--;
           break;
@@ -185,4 +203,5 @@ class Scene {
   std::default_random_engine random_engine_;
   glm::vec2 cursor_;
   double elapsed_since_last_enemy_spawn_{SPAWN_DELAY};
+  double time_ = 0;
 };

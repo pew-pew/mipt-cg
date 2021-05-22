@@ -34,13 +34,16 @@ inline uint createShader(std::string path, uint shader_type) {
   return shader;
 }
 
-inline uint createShaderProgram(std::string vertexPath, std::string fragmentPath) {
+inline uint createShaderProgram(std::string vertexPath, std::string fragmentPath, std::string geometryPath="") {
   uint vertexShader = createShader(vertexPath, GL_VERTEX_SHADER);
   uint fragmentShader = createShader(fragmentPath, GL_FRAGMENT_SHADER);
+  uint geometryShader = (!geometryPath.empty() ? createShader(geometryPath, GL_GEOMETRY_SHADER) : 0);
 
   uint shaderProgram = glCreateProgram();
   glAttachShader(shaderProgram, vertexShader);
   glAttachShader(shaderProgram, fragmentShader);
+  if (!geometryPath.empty())
+    glAttachShader(shaderProgram, geometryShader);
   glLinkProgram(shaderProgram);
   {
     int success = 0;
@@ -54,6 +57,8 @@ inline uint createShaderProgram(std::string vertexPath, std::string fragmentPath
   }
   glDeleteShader(vertexShader);
   glDeleteShader(fragmentShader);
+  if (!geometryPath.empty())
+    glDeleteShader(geometryShader);
 
   return shaderProgram;
 }
