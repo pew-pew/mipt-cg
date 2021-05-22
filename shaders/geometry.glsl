@@ -15,8 +15,8 @@ out GS_OUT {
 
 uniform mat4 M, V, P;
 uniform float explosionTime;
-uniform vec3 explosionDir_world;
 uniform float explosionTotalTime;
+uniform vec3 explosionDir_world;
 uniform vec3 explosionPos_world;
 
 vec3 rotateAround(vec3 v, vec3 axis, float angle) {
