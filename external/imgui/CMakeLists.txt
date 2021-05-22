@@ -31,7 +31,7 @@ target_include_directories(
   ./imgui/backends
 )
 
-target_link_libraries(imgui_glfw_gl3 imgui)
+target_link_libraries(imgui_glfw_gl3 imgui glfw libglew_static)
 
 # Bundled example
 
