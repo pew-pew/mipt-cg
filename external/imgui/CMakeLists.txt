@@ -29,12 +29,9 @@ target_include_directories(
   PUBLIC
   ./imgui
   ./imgui/backends
-  PRIVATE
-  ${CMAKE_SOURCE_DIR}/external/glfw/include
-  ${CMAKE_SOURCE_DIR}/external/glew-cmake/include
 )
 
-target_link_libraries(imgui_glfw_gl3 imgui)
+target_link_libraries(imgui_glfw_gl3 imgui glfw libglew_static)
 
 # Bundled example
 
