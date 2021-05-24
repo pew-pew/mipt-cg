@@ -30,11 +30,26 @@ struct Graphics {
     (IS_EMSCRIPTEN ? "doesnotexist"               : "./shaders/geometry.glsl")
   );
 
+  uint skybox_shader_program = createShaderProgram(
+      "./shaders/skybox_vertex.glsl",
+      "./shaders/skybox_fragment.glsl"
+  );
+
   Mesh roma_mesh = loadSimpleObj("./data/roma_smol.obj");
   uint roma_texture = loadTexture("./data/roma_smol.jpg");
 
   Mesh projectile_mesh = loadSimpleObj("./data/projectile.obj");
   uint projectile_texture = loadTexture("./data/projectile.jpg");
+
+  Mesh skybox_mesh = genCube();
+  uint skybox_texture = loadCubemap({
+    "./data/skybox/posx.jpg",
+    "./data/skybox/negx.jpg",
+    "./data/skybox/posy.jpg",
+    "./data/skybox/negy.jpg",
+    "./data/skybox/posz.jpg",
+    "./data/skybox/negz.jpg",
+  });
 
   GLFWwindow *window;
   int width, height;
@@ -56,6 +71,27 @@ struct Graphics {
   }
 
   void drawScene(double current_time, Scene &scene) {
+    glm::vec3 player_camera_pos = scene.player.pos + Scene::PERSON_HEAD;
+    glm::mat4 view = glm::lookAt(player_camera_pos,
+                                 player_camera_pos + scene.player.getDir() * glm::vec3{0, 0, -1},
+                                 scene.player.getDir() * glm::vec3{0, 1, 0});
+    glm::mat4 projection = glm::perspective<float>(glm::radians(60.),
+                                                   (float)width / height,
+                                                   0.01, 100);
+    glm::vec3 light_pos = player_camera_pos;
+    if (!scene.projectiles.empty())
+      light_pos = scene.projectiles.back().pos;
+
+    glDepthMask(GL_FALSE);
+    glUseProgram(skybox_shader_program);
+    int v_matrix_sky_id = glGetUniformLocation(skybox_shader_program, "V");
+    int p_matrix_sky_id = glGetUniformLocation(skybox_shader_program, "P");
+    glUniformMatrix4fv(v_matrix_sky_id, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(p_matrix_sky_id, 1, GL_FALSE, glm::value_ptr(projection));
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skybox_texture);
+    skybox_mesh.draw();
+    glDepthMask(GL_TRUE);
+
     // I don't care about performance
     int expl_time_id = glGetUniformLocation(shader_program, "explosionTime");
     int expl_total_time_id = glGetUniformLocation(shader_program, "explosionTotalTime");
@@ -68,17 +104,6 @@ struct Graphics {
     int light_pos_id = glGetUniformLocation(shader_program, "light_pos");
     int ambient_id = glGetUniformLocation(shader_program, "ambientK");
     int texture_id = glGetUniformLocation(shader_program, "tex");
-
-    glm::vec3 player_camera_pos = scene.player.pos + Scene::PERSON_HEAD;
-    glm::mat4 view = glm::lookAt(player_camera_pos,
-                                     player_camera_pos + scene.player.getDir() * glm::vec3{0, 0, -1},
-                                     scene.player.getDir() * glm::vec3{0, 1, 0});
-    glm::mat4 projection = glm::perspective<float>(glm::radians(60.),
-                                                   (float)width / height,
-                                                   0.01, 100);
-    glm::vec3 light_pos = player_camera_pos;
-    if (!scene.projectiles.empty())
-      light_pos = scene.projectiles.back().pos;
 
     glUseProgram(shader_program);
     glUniformMatrix4fv(v_matrix_id, 1, GL_FALSE, glm::value_ptr(view));

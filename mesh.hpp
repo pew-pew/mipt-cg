@@ -91,6 +91,16 @@ struct Mesh {
     });
   }
 
+  static Mesh fromPos(std::vector<glm::vec3> positions) {
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+    for (size_t i = 0; i < positions.size(); i++) {
+      vertices.push_back(Vertex{positions[i]});
+      indices.push_back(i);
+    }
+    return Mesh(std::move(vertices), std::move(indices));
+  }
+
   void draw() {
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
@@ -159,4 +169,30 @@ Mesh loadSimpleObj(std::string path) {
   }
 
   return Mesh(std::move(vertices), std::move(indices));
+}
+
+
+std::vector<glm::vec3> genCubeVerts() {
+  std::vector<glm::vec3> pts;
+
+  auto addSide = [&](glm::quat rot) {
+    pts.push_back(rot * glm::vec3{-1, -1, 1});
+    pts.push_back(rot * glm::vec3{ 1, -1, 1});
+    pts.push_back(rot * glm::vec3{-1,  1, 1});
+
+    pts.push_back(rot * glm::vec3{ 1,  1, 1});
+    pts.push_back(rot * glm::vec3{-1,  1, 1});
+    pts.push_back(rot * glm::vec3{ 1, -1, 1});
+  };
+
+  for (float rots : {0., 0.25, 0.5, 0.75})
+    addSide(glm::angleAxis(glm::two_pi<float>() * rots, glm::vec3(0, 1, 0)));
+  for (float rots : {-0.25, 0.25})
+    addSide(glm::angleAxis(glm::two_pi<float>() * rots, glm::vec3(1, 0, 0)));
+
+  return pts;
+}
+
+Mesh genCube() {
+  return Mesh::fromPos(genCubeVerts());
 }
