@@ -35,6 +35,12 @@ struct Graphics {
       "./shaders/skybox_fragment.glsl"
   );
 
+  uint ground_shader_program =
+      createShaderProgram(
+      "./shaders/ground_vertex.glsl",
+      "./shaders/fragment.glsl"
+  );
+
   Mesh roma_mesh = loadSimpleObj("./data/roma_smol.obj");
   uint roma_texture = loadTexture("./data/roma_smol.jpg");
 
@@ -50,6 +56,9 @@ struct Graphics {
     "./data/skybox/posz.jpg",
     "./data/skybox/negz.jpg",
   });
+
+  Mesh ground_mesh = genSquareSurface();
+  uint ground_texture = loadTexture("./data/ground_col.jpg");
 
   GLFWwindow *window;
   int width, height;
@@ -82,6 +91,8 @@ struct Graphics {
     if (!scene.projectiles.empty())
       light_pos = scene.projectiles.back().pos;
 
+    // I don't care about performance
+
     glDepthMask(GL_FALSE);
     glUseProgram(skybox_shader_program);
     int v_matrix_sky_id = glGetUniformLocation(skybox_shader_program, "V");
@@ -92,7 +103,44 @@ struct Graphics {
     skybox_mesh.draw();
     glDepthMask(GL_TRUE);
 
-    // I don't care about performance
+    {
+      glm::mat4 ground_transform =
+          glm::translate(scene.player.pos + glm::vec3{0.0f, GROUND_Y_LEVEL, 0.0f}) *
+          glm::scale(glm::vec3{
+                GROUND_RENDER_RADIUS,
+                GROUND_RENDER_RADIUS,
+                GROUND_RENDER_RADIUS
+              });
+
+      int m_matrix_id = glGetUniformLocation(ground_shader_program, "M");
+      int v_matrix_id = glGetUniformLocation(ground_shader_program, "V");
+      int p_matrix_id = glGetUniformLocation(ground_shader_program, "P");
+      int light_pos_id = glGetUniformLocation(ground_shader_program, "light_pos");
+      int ambient_id = glGetUniformLocation(ground_shader_program, "ambientK");
+      int texture_id = glGetUniformLocation(ground_shader_program, "tex");
+
+      glUseProgram(ground_shader_program);
+
+      glUniformMatrix4fv(v_matrix_id, 1, GL_FALSE, glm::value_ptr(view));
+      glUniformMatrix4fv(p_matrix_id,
+                         1,
+                         GL_FALSE,
+                         glm::value_ptr(projection));
+      glUniformMatrix4fv(m_matrix_id,
+                         1,
+                         GL_FALSE,
+                         glm::value_ptr(ground_transform));
+
+      glUniform3fv(light_pos_id, 1, glm::value_ptr(light_pos));
+      glUniform1f(ambient_id, 0.5f);
+
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, ground_texture);
+      glUniform1i(texture_id, 0);
+
+      ground_mesh.draw();
+    }
+
     int expl_time_id = glGetUniformLocation(shader_program, "explosionTime");
     int expl_total_time_id = glGetUniformLocation(shader_program, "explosionTotalTime");
     int expl_pos_id = glGetUniformLocation(shader_program, "explosionPos_world");
@@ -106,9 +154,12 @@ struct Graphics {
     int texture_id = glGetUniformLocation(shader_program, "tex");
 
     glUseProgram(shader_program);
+
     glUniformMatrix4fv(v_matrix_id, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(p_matrix_id, 1, GL_FALSE, glm::value_ptr(projection));
+
     glUniform3fv(light_pos_id, 1, glm::value_ptr(light_pos));
+    glUniform1f(ambient_id, 0.2f);
 
     {
       glm::vec3 dummy{1, 0, 0};
@@ -122,9 +173,9 @@ struct Graphics {
     glBindTexture(GL_TEXTURE_2D, roma_texture);
     glUniform1i(texture_id, 0);
 
-    glUniform1f(ambient_id, 0.1f);
     for (auto& enemy_trans : scene.enemies) {
-      glm::mat4 model = enemy_trans.getMat();
+      glm::mat4 model = enemy_trans.getMat()
+          * glm::translate(glm::vec3{0, -0.144, 0});
 
       glUniformMatrix4fv(m_matrix_id, 1, GL_FALSE, glm::value_ptr(model));
       roma_mesh.draw();
@@ -163,7 +214,7 @@ struct Graphics {
             * glm::scale(glm::vec3{1., 1., 1.} / 5.0f)
         );
       } else {
-        model = obj.transform.getMat();
+        model = obj.transform.getMat() * glm::translate(glm::vec3{0, -0.144, 0});
       }
       glUniform3fv(expl_dir_id, 1, glm::value_ptr(obj.explosion_dir));
       glUniform3fv(expl_pos_id, 1, glm::value_ptr(obj.explosion_pos));
@@ -182,4 +233,8 @@ struct Graphics {
       }
     }
   }
+
+ private:
+  static constexpr float GROUND_RENDER_RADIUS = 100.0f;
+  static constexpr float GROUND_Y_LEVEL = 0.0f;
 };

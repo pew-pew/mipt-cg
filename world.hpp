@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-#include <random>
 
 #include <chrono>
 #include <cmath>
@@ -13,6 +11,7 @@
 #include <chrono>
 #include <algorithm>
 #include <cstdlib>
+#include <random>
 
 #include <GLFW/glfw3.h>
 
@@ -64,20 +63,19 @@ class Scene {
   Scene(InputContext *input_ctx, int64_t random_seed)
         : input_(input_ctx)
         , random_engine_(random_seed)
-        , cursor_(input_ctx->mouse_input.getPos())
-  {
+        , cursor_(input_ctx->mouse_input.getPos()) {
   }
 
  public:
   AngleTransform player{
-      {0, 2, 0}, 0.0f, 0.0f
+      {0, 0, 0}, 0.0f, 0.0f
   };
   std::vector<QuatTransform> enemies;
   std::vector<QuatTransform> projectiles;
   std::vector<DyingObject> dying_objects;
   int killed_count = 0;
 
-  static constexpr glm::vec3 PERSON_HEAD{0, 1.5, 0};
+  static constexpr glm::vec3 PERSON_HEAD{0, 1.35, 0};
 
   void update(double elapsed_time) {
     time_ += elapsed_time;

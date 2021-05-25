@@ -32,14 +32,6 @@
 #include <glm/gtx/transform.hpp>
 using namespace glm;
 
-#include "utils.hpp"
-#include "shader.hpp"
-#include "mesh.hpp"
-#include "world.hpp"
-#include "input.hpp"
-#include "graphics.hpp"
-#include "ui.hpp"
-
 void dumpGLErrors(std::string location="") {
   GLenum err;
   while((err = glGetError()) != GL_NO_ERROR)
@@ -48,6 +40,14 @@ void dumpGLErrors(std::string location="") {
   }
 }
 #define GLCHECK dumpGLErrors(__FILE__ ":"  + std::to_string(__LINE__) + ":")
+
+#include "utils.hpp"
+#include "shader.hpp"
+#include "mesh.hpp"
+#include "world.hpp"
+#include "input.hpp"
+#include "graphics.hpp"
+#include "ui.hpp"
 
 GLFWwindow* initGlewGLFW() {
   // Initialise GLFW

@@ -20,7 +20,7 @@ void main()
   float diffuseK = max(0, dot(normalize(to_light), normalize(normal)));
   float specularK = max(0, dot(normalize(to_camera), reflect(-normalize(to_light), normalize(normal))));
 
-  vec3 lightColor = vec3(0.9, 0.7, 0);
+  vec3 lightColor = vec3(0.9, 0.9, 0.9);
   vec3 incoming = lightColor * (lightPower * (pow(specularK, 5) * 0.2  + diffuseK) + ambientK);
 
   color = vec4(reflectance * incoming, 1);

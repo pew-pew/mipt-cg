@@ -1,4 +1,5 @@
 #version 330 core
+
 layout (location = 0) in vec3 pos_model;
 
 out vec3 tex_coord;
