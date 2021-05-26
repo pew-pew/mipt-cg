@@ -151,7 +151,7 @@ int main()
     last_time = current_time;
 
     game_time += frame_time * timeSpeed;
-    scene.update(frame_time * timeSpeed);
+    scene.update(frame_time * timeSpeed, game_time);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

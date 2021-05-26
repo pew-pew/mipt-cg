@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <deque>
 #include <iostream>
 #include <thread>
 #include <functional>
@@ -72,17 +73,18 @@ class Scene {
   };
   std::vector<QuatTransform> enemies;
   std::vector<QuatTransform> projectiles;
-  std::vector<DyingObject> dying_objects;
+  std::deque<DyingObject> dying_objects;
   int killed_count = 0;
 
   static constexpr glm::vec3 PERSON_HEAD{0, 1.35, 0};
 
-  void update(double elapsed_time) {
+  void update(double elapsed_time, double game_time) {
     time_ += elapsed_time;
     movePlayer(elapsed_time);
     spawnEnemies(elapsed_time);
     moveProjectiles(elapsed_time);
     checkCollisions();
+    clearMemory(game_time);
   }
 
   void spawnProjectile() {
@@ -165,11 +167,20 @@ class Scene {
         }
       }
     }
+  }
 
+  void clearMemory(double game_time) {
     for (size_t ip = 0; ip < projectiles.size(); ip++) {
       if (glm::length(projectiles[ip].pos - player.pos) > 100) {
         projectiles.erase(projectiles.begin() + ip);
         ip--;
+      }
+    }
+
+    for (size_t id = 0; id < dying_objects.size(); id++) {
+      if (game_time - dying_objects[id].death_start > dying_objects[id].death_duration) {
+        dying_objects.erase(dying_objects.begin() + id);
+        id--;
       }
     }
   }
