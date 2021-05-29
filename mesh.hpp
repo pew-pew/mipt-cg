@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 #include <GL/glew.h>
 
 struct Mesh {
@@ -99,6 +100,17 @@ struct Mesh {
       indices.push_back(i);
     }
     return Mesh(std::move(vertices), std::move(indices));
+  }
+
+  static Mesh fromPosNorm(
+      const std::vector<glm::vec3>& positions,
+      const std::vector<glm::vec3>& norms) {
+    assert(positions.size() == norms.size());
+    return createMeshByVertexGenerator(positions.size(), [&](size_t i) {
+      Vertex v = {};
+      v.pos = positions[i], v.normal = norms[i];
+      return v;
+    });
   }
 
   void draw() {
@@ -195,4 +207,20 @@ std::vector<glm::vec3> genCubeVerts() {
 
 Mesh genCube() {
   return Mesh::fromPos(genCubeVerts());
+}
+
+Mesh genSquareSurface() {
+  std::vector<glm::vec3> pts;
+
+  pts.emplace_back(-1, 0, -1);
+  pts.emplace_back(1, 0, -1);
+  pts.emplace_back(1, 0, 1);
+
+  pts.emplace_back(-1, 0, -1);
+  pts.emplace_back(1, 0, 1);
+  pts.emplace_back(-1, 0, 1);
+
+  std::vector<glm::vec3> norms(6, {0, 1, 0});
+
+  return Mesh::fromPosNorm(pts, norms);
 }

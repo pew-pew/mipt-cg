@@ -1,16 +1,20 @@
 #version 330 core
 
+#define MAX_NUM_OF_LIGHTS 10
+
 layout (triangles) in;
 layout (triangle_strip, max_vertices = 3) out;
 
 in VS_OUT {
   vec2 tex_coord;
-  vec3 to_light, to_camera, normal;
+  vec3 to_camera, normal;
+  vec3 to_light_array[MAX_NUM_OF_LIGHTS];
 } vs_out[3];
 
 out GS_OUT {
   vec2 tex_coord;
-  vec3 to_light, to_camera, normal;
+  vec3 to_camera, normal;
+  vec3 to_light_array[MAX_NUM_OF_LIGHTS];
 } gs_out;
 
 uniform mat4 M, V, P;
@@ -18,6 +22,7 @@ uniform float explosionTime;
 uniform float explosionTotalTime;
 uniform vec3 explosionDir_world;
 uniform vec3 explosionPos_world;
+uniform int number_of_lights;
 
 vec3 rotateAround(vec3 v, vec3 axis, float angle) {
   vec4 q = vec4(sin(angle) * axis, cos(angle));
@@ -49,7 +54,9 @@ void main() {
 
   for (int i = 0; i < 3; i++) {
     gs_out.tex_coord = vs_out[i].tex_coord;
-    gs_out.to_light = rotateAround(vs_out[i].to_light, rotAxis, angle);
+    for (int j = 0; j < number_of_lights; ++j) {
+      gs_out.to_light_array[j] = rotateAround(vs_out[i].to_light_array[j], rotAxis, angle);
+    }
     gs_out.to_camera = rotateAround(vs_out[i].to_camera, rotAxis, angle);
     gs_out.normal = rotateAround(vs_out[i].normal, rotAxis, angle);
 
